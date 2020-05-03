@@ -1,7 +1,9 @@
 #+title: IATI Datastore challenge for FTS
 #+PROPERTY: header-args :eval never-export :exports both
+#+EXCLUDE_TAGS: noexport
+#+HTML_HEAD: <link rel="stylesheet" type="text/css" href="https://gongzhitaao.org/orgcss/org.css"/>
 
-* load virtual env
+* load virtual env                                                 :noexport:
 ** workon the virtual environment "iatidatastore-fts" 
 : M-x pyvenv workon ; and select the right environment
 
@@ -35,7 +37,7 @@ which pip
   : M-x list-processes
   
  
-* setup storage 
+* setup storage                                                    :noexport:
 
 #+BEGIN_SRC python :session datastore :results output raw :exports none
 import os
@@ -57,10 +59,10 @@ pip install requests
 pip install pandas
 pip install arrow
 pip install matplotlib
-pip install feather-format
+pip install tabular
 #+END_SRC
 
-** review
+** review                                                         :noexport:
 - using async from ob-async 
 
 * load libraries
@@ -69,7 +71,7 @@ pip install feather-format
 import requests as rq
 import pandas as pd
 import arrow
-import matplotlib
+from tabulate import tabulate
 #+END_SRC
 
 #+RESULTS:
@@ -105,15 +107,15 @@ def get_hash(url):
 
 #+RESULTS:
 
-* exploration
+* Data Exploration from datastore
 
-** explore specific activity
+** Explore specific activity
 
 #+BEGIN_SRC python :session datastore :results output
 iati_activity = "GB-GOV-1-300417-108"
 activity_query_string = (f"https://iati.cloud/search/activity?q=" # return activitiy
         f"iati_identifier:{iati_activity} " # that matches the given iati_identifuer
-        f"&fl=iati_identifier,title_narrative_text,description_narrative_text,humanitarian,reporting_org_ref,"
+        f"&fl=iati_identifier,title_narrative_text,description_narrative_text,humanitarian,reporting_org_ref, "
         f"activity_date_start_planned,activity_date_start_actual,activity_date_end_planned,activity_date_end_actual,activity_status_code,"
         f"transaction,budget" # returning the following fields 
         f"&wt=json" # in JSON format
@@ -122,8 +124,7 @@ print(f"{activity_query_string.replace(' ', '%20')}")
 #+END_SRC
 
 #+RESULTS:
-: https://iati.cloud/search/activity?q=iati_identifier:GB-GOV-1-300417-108%20&fl=iati_identifier,title_narrative_text,description_narrative_text,humanitarian,reporting_org_ref,activity_date_start_planned,activity_date_start_actual,activity_date_end_planned,activity_date_end_actual,activity_status_code,transaction,budget&wt=json&rows=1
- https://iati.cloud/search/activity?q=iati_identifier:GB-GOV-1-300417-108%20&fl=iati_identifier,title_narrative_text,description_narrative_text,humanitarian,reporting_org_ref,activity_date_start_planned,activity_date_start_actual,activity_date_end_planned,activity_date_end_actual,activity_status_code,transaction,budget&wt=json&rows=1
+: https://iati.cloud/search/activity?q=iati_identifier:GB-GOV-1-300417-108%20&fl=iati_identifier,title_narrative_text,description_narrative_text,humanitarian,reporting_org_ref,%20activity_date_start_planned,activity_date_start_actual,activity_date_end_planned,activity_date_end_actual,activity_status_code,transaction,budget&wt=json&rows=1
 
 #+BEGIN_SRC python :session datastore :results output :results:raw
 out_json = json.loads(get_data(activity_query_string))
@@ -137,6 +138,9 @@ print(out_json["response"]["docs"][0]["title_narrative_text"][0])
 : Funding to support Standby Partnerships in Yemen
 
 
+
+*** TODO improve the process of moving result from one src to another 
+
 #+NAME: json_filepath
 #+BEGIN_SRC python :session datastore :results output raw
 print(get_cache_filepath(get_hash(activity_query_string)))
@@ -145,7 +149,6 @@ print(get_cache_filepath(get_hash(activity_query_string)))
 #+RESULTS: json_filepath
 /Users/anjesh/Workspace_storage/iatidatastore-fts/cache/762ca6b3e70b0d4b75ce791b900dba37
 
-*** TODO improve the process of moving result from one src to another 
 - moving result from one src block to another and open in new buffer
 
 #+NAME: mystream
@@ -312,7 +315,7 @@ options(crayon.enabled = FALSE)
 iati_publisher = "GB-GOV-1"
 publisher_query_string = (f"https://iati.cloud/search/activity?q=" # return activitiy
         f"reporting_org_ref:{iati_publisher} " # that matches the given iati_publisher
-        f"&fl=iati_identifier,title_narrative_text,description_narrative_text,humanitarian,reporting_org_ref,"
+        f"&fl=iati_identifier,title_narrative_text,description_narrative_text,humanitarian,reporting_org_ref, "
         f"activity_date_start_planned,activity_date_start_actual,activity_date_end_planned,activity_date_end_actual,activity_status_code,"
         f"transaction,budget,recipient_country_code" # returning the following fields 
         f"&wt=json" # in JSON format
@@ -321,8 +324,7 @@ print(f"{publisher_query_string.replace(' ', '%20')}")
 #+END_SRC
 
 #+RESULTS:
-: https://iati.cloud/search/activity?q=reporting_org_ref:GB-GOV-1%20&fl=iati_identifier,title_narrative_text,description_narrative_text,humanitarian,reporting_org_ref,activity_date_start_planned,activity_date_start_actual,activity_date_end_planned,activity_date_end_actual,activity_status_code,transaction,budget,recipient_country_code&wt=json&rows=19278
-https://iati.cloud/search/activity?q=reporting_org_ref:GB-GOV-1%20&fl=iati_identifier,title_narrative_text,description_narrative_text,humanitarian,reporting_org_ref,activity_date_start_planned,activity_date_start_actual,activity_date_end_planned,activity_date_end_actual,activity_status_code,transaction,budget,recipient_country_code&wt=json&rows=1
+: https://iati.cloud/search/activity?q=reporting_org_ref:GB-GOV-1%20&fl=iati_identifier,title_narrative_text,description_narrative_text,humanitarian,reporting_org_ref,%20activity_date_start_planned,activity_date_start_actual,activity_date_end_planned,activity_date_end_actual,activity_status_code,transaction,budget,recipient_country_code&wt=json&rows=19278
 
 *** Making API Call
 - Get the data from the cache if available, else make an API call
@@ -390,6 +392,7 @@ print(out_json["response"]["docs"][0]["transaction"][0])
         ],
         "receiver_activity_id": null,
         "receiver_activity": null,
+
         "type": null,
         "ref": "Not available"
     },
@@ -585,117 +588,209 @@ pd.set_option('display.max_rows', 10)
 #+RESULTS:
 #+begin_EXPORT output
 name
- NA (missing country)                                         7512
-Afghanistan                                                    455
-Albania                                                         10
-American Samoa                                                   2
-Angola                                                          16
-Armenia                                                          8
-Bahamas (the)                                                    2
+ NA (missing country)                                           11
+Afghanistan                                                     34
+Albania                                                          7
+Algeria                                                          9
+American Samoa                                                   1
+Andorra                                                          1
+Angola                                                           6
+Antigua and Barbuda                                              6
+Argentina                                                        9
+Armenia                                                         12
+Australia                                                        2
+Austria                                                          2
+Azerbaijan                                                       5
 Bahrain                                                          2
-Bangladesh                                                     470
-Benin                                                            2
-Bosnia and Herzegovina                                          53
-Brazil                                                          15
-Burkina Faso                                                     5
-Burundi                                                         81
-Cabo Verde                                                       2
-Cambodia                                                        64
-Cameroon                                                        27
-Central African Republic (the)                                  44
-Chad                                                            13
-Chile                                                            3
-China                                                           98
-Colombia                                                         1
-Congo (the Democratic Republic of the)                         323
-Congo (the)                                                      4
-Cuba                                                             2
-CÃ´te d'Ivoire                                                  10
-Dominica                                                         9
-Ecuador                                                          3
-Egypt                                                           17
-Eritrea                                                         14
-Ethiopia                                                       533
-Fiji                                                             2
-Gambia (the)                                                    20
-Georgia                                                          8
-Ghana                                                          350
-Greece                                                           7
-Guatemala                                                        5
-Guinea                                                           2
-Guyana                                                          24
-Haiti                                                           54
-Honduras                                                         2
-India                                                          442
-Indonesia                                                      157
-Iran (Islamic Republic of)                                       1
-Iraq                                                            79
-Jamaica                                                         41
-Japan                                                            4
-Jordan                                                         101
-Kenya                                                          530
-Kosovo                                                          65
-Kyrgyzstan                                                      56
-Lao People's Democratic Republic (the)                          11
-Lebanon                                                         94
-Lesotho                                                         26
-Liberia                                                         64
-Libya                                                           85
-Madagascar                                                       7
-Malawi                                                         434
-Maldives                                                         2
-Mali                                                            11
-Mauritania                                                       2
-Moldova (the Republic of)                                       48
-Mongolia                                                         2
-Montserrat                                                     198
-Mozambique                                                     316
-Myanmar                                                        300
-Nepal                                                          446
-Nicaragua                                                       11
-Niger (the)                                                     10
-Nigeria                                                        509
-Pakistan                                                       564
-Palestine, State of                                            191
-Papua New Guinea                                                 6
-Peru                                                             8
-Philippines (the)                                               17
-Pitcairn                                                        36
-Russian Federation (the)                                        12
-Rwanda                                                         298
-Saint Helena, Ascension and Tristan da Cunha                   177
-Saint Lucia                                                      2
-Samoa                                                            2
-Senegal                                                          6
-Serbia                                                          44
-Sierra Leone                                                   494
-Solomon Islands                                                  4
-Somalia                                                        398
-South Africa                                                    95
-South Sudan                                                    275
-Sri Lanka                                                       48
-Sudan (the)                                                    298
-Syrian Arab Republic                                           190
-Tajikistan                                                     119
-Tanzania, United Republic of                                   462
-Thailand                                                         2
-Timor-Leste                                                      2
-Togo                                                             2
-Tunisia                                                          5
-Turkey                                                          17
-Turks and Caicos Islands (the)                                  15
-Uganda                                                         389
-Ukraine                                                         64
-United Arab Emirates (the)                                       2
-United Kingdom of Great Britain and Northern Ireland (the)      16
-Uzbekistan                                                       2
-Vanuatu                                                          4
-Venezuela (Bolivarian Republic of)                               4
-Viet Nam                                                        98
-Virgin Islands (British)                                         2
-Yemen                                                          201
-Zambia                                                         300
-Zimbabwe                                                       239
+Bangladesh                                                     138
+Barbados                                                         3
+Belarus                                                          6
+Belgium                                                          2
+Belize                                                           9
+Benin                                                           28
+Bhutan                                                          50
+Bolivia (Plurinational State of)                                25
+Bosnia and Herzegovina                                           8
+Botswana                                                        17
+Brazil                                                          11
+Brunei Darussalam                                                1
+Bulgaria                                                         2
+Burkina Faso                                                    34
+Burundi                                                         20
+Cabo Verde                                                       4
+Cambodia                                                        58
+Cameroon                                                        21
+Canada                                                          14
+Cayman Islands (the)                                             1
+Central African Republic (the)                                   5
+Chad                                                            19
+Chile                                                           10
+China                                                           25
+Colombia                                                        26
+Comoros (the)                                                    5
+Congo (the Democratic Republic of the)                          38
+Congo (the)                                                     10
+Cook Islands (the)                                               3
+Costa Rica                                                       9
+Croatia                                                          2
+Cuba                                                             9
+CuraÃ§ao                                                         2
+Cyprus                                                           1
+CÃ´te d'Ivoire                                                  13
+Denmark                                                          1
+Djibouti                                                         9
+Dominica                                                         4
+Dominican Republic (the)                                         6
+Ecuador                                                         12
+Egypt                                                           12
+El Salvador                                                     12
+Equatorial Guinea                                                2
+Eritrea                                                          6
+Estonia                                                          3
+Eswatini                                                        16
+Ethiopia                                                        66
+Fiji                                                            12
+Finland                                                          2
+France                                                           3
+French Guiana                                                    1
+Gabon                                                            5
+Gambia (the)                                                    12
+Georgia                                                         18
+Germany                                                          3
+Ghana                                                           46
+Greece                                                           4
+Grenada                                                          5
+Guam                                                             2
+Guatemala                                                       22
+Guinea                                                          13
+Guinea-Bissau                                                    3
+Guyana                                                          13
+Haiti                                                           21
+Honduras                                                        20
+Hong Kong                                                        1
+Hungary                                                          4
+Iceland                                                          1
+India                                                           91
+Indonesia                                                       46
+Iran (Islamic Republic of)                                       4
+Iraq                                                            12
+Ireland                                                          1
+Israel                                                           3
+Jamaica                                                          9
+Japan                                                            2
+Jordan                                                          20
+Kazakhstan                                                       9
+Kenya                                                           61
+Kiribati                                                         2
+Korea (the Democratic People's Republic of)                      3
+Korea (the Republic of)                                          2
+Kosovo                                                           3
+Kuwait                                                           3
+Kyrgyzstan                                                      14
+Lao People's Democratic Republic (the)                          40
+Latvia                                                           2
+Lebanon                                                         12
+Lesotho                                                         18
+Liberia                                                         21
+Libya                                                            6
+Liechtenstein                                                    1
+Lithuania                                                        3
+Luxembourg                                                       2
+Madagascar                                                      18
+Malawi                                                          50
+Malaysia                                                        15
+Maldives                                                        15
+Mali                                                            34
+Malta                                                            2
+Marshall Islands (the)                                           2
+Mauritania                                                      11
+Mauritius                                                        3
+Mexico                                                          11
+Micronesia (Federated States of)                                 4
+Moldova (the Republic of)                                        8
+Monaco                                                           1
+Mongolia                                                        24
+Montenegro                                                       3
+Montserrat                                                       2
+Morocco                                                         14
+Mozambique                                                      41
+Myanmar                                                         68
+Nauru                                                            1
+Nepal                                                         5728
+Netherlands (the)                                                5
+New Zealand                                                      3
+Nicaragua                                                       18
+Niger (the)                                                     26
+Nigeria                                                         30
+Niue                                                             1
+North Macedonia                                                  8
+Norway                                                           5
+Oman                                                             3
+Pakistan                                                        88
+Palau                                                            2
+Palestine, State of                                             11
+Panama                                                           5
+Papua New Guinea                                                11
+Paraguay                                                        10
+Peru                                                            35
+Philippines (the)                                               37
+Poland                                                           3
+Portugal                                                         2
+Qatar                                                            3
+Romania                                                          2
+Russian Federation (the)                                         6
+Rwanda                                                          28
+Saint Helena, Ascension and Tristan da Cunha                     1
+Saint Kitts and Nevis                                            2
+Saint Lucia                                                      6
+Saint Vincent and the Grenadines                                 3
+Samoa                                                            6
+Sao Tome and Principe                                            4
+Saudi Arabia                                                     2
+Senegal                                                         38
+Serbia                                                           5
+Seychelles                                                       3
+Sierra Leone                                                    34
+Singapore                                                        1
+Slovakia                                                         3
+Slovenia                                                         1
+Solomon Islands                                                  7
+Somalia                                                         16
+South Africa                                                    29
+South Sudan                                                     23
+Spain                                                            3
+Sri Lanka                                                       73
+Sudan (the)                                                     19
+Suriname                                                        10
+Sweden                                                           4
+Switzerland                                                      3
+Syrian Arab Republic                                            13
+Tajikistan                                                      14
+Tanzania, United Republic of                                    57
+Thailand                                                        26
+Timor-Leste                                                     11
+Togo                                                            13
+Tokelau                                                          1
+Tonga                                                            5
+Trinidad and Tobago                                              6
+Tunisia                                                         14
+Turkey                                                           8
+Turkmenistan                                                     1
+Tuvalu                                                           9
+Uganda                                                          65
+Ukraine                                                         18
+United Arab Emirates (the)                                       1
+United Kingdom of Great Britain and Northern Ireland (the)       9
+United States of America (the)                                   3
+Uruguay                                                          4
+Uzbekistan                                                       3
+Vanuatu                                                          8
+Venezuela (Bolivarian Republic of)                               3
+Viet Nam                                                        33
+Wallis and Futuna                                                1
+Yemen                                                           21
+Zambia                                                          42
+Zimbabwe                                                        34
 Name: iati_identifier, dtype: int64
 #+end_EXPORT
 
@@ -1004,44 +1099,25 @@ country_transactions_df = pd.concat(country_transactions_list)
 
 #+RESULTS:
 
-#+BEGIN_SRC python :session datastore
-def arr_to_org(arr):
-    line = "|".join(str(item) for item in arr)
-    return "|{}|".format(line)
-
-def df_to_org(df):
-    return "\n".join([arr_to_org(df.columns)]
-        + [arr_to_org(row) for row in df.values])
-
-
-#+END_SRC
-
-#+RESULTS:
-
-
-#+BEGIN_SRC python :session datastore :results output raw :wrap SRC output 
+#+BEGIN_SRC python :session datastore :results output raw 
 pd.options.display.float_format = '{:,.2f}'.format
 country_transactions_df["value"] = pd.to_numeric(country_transactions_df["value"], errors = "ignore")
-print(country_transactions_df.groupby("type").agg({'iati_identifier': 'count', 'value': 'sum'}))
+print(tabulate(country_transactions_df.groupby("type").agg({'iati_identifier': 'count', 'value': 'sum'}).rename(columns={'iati_identifier':'instances'}),
+               headers="keys",
+               tablefmt="orgtbl",
+               floatfmt=("", ".0f",".2f")))
+
 
 #+END_SRC
 
 #+RESULTS:
-#+begin_SRC output
-iati_identifier              value
-type                                                   
-Disbursement                   22145  35,835,720,236.69
-Expenditure                     6844   6,458,383,441.47
-Incoming Commitment              633     886,760,704.35
-Incoming Funds                  3863 164,381,488,476.33
-Interest Payment                1862      -9,994,265.39
-Loan Repayment                   347     661,946,609.95
-Outgoing Commitment             6570  50,350,784,206.72
-Reimbursement                     52      -3,281,328.66
-#+end_SRC
-
-
-
-
-
-
+| type                | instances |           value |
+|---------------------+-----------+-----------------|
+| Disbursement        |     22145 |  35835720236.69 |
+| Expenditure         |      6844 |   6458383441.47 |
+| Incoming Commitment |       633 |    886760704.35 |
+| Incoming Funds      |      3863 | 164381488476.33 |
+| Interest Payment    |      1862 |     -9994265.39 |
+| Loan Repayment      |       347 |    661946609.95 |
+| Outgoing Commitment |      6570 |  50350784206.72 |
+| Reimbursement       |        52 |     -3281328.66 |
