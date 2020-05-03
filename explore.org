@@ -1,7 +1,12 @@
 #+title: IATI Datastore challenge for FTS
 #+PROPERTY: header-args :eval never-export :exports both
 #+EXCLUDE_TAGS: noexport
-#+HTML_HEAD: <link rel="stylesheet" type="text/css" href="https://gongzhitaao.org/orgcss/org.css"/>
+#+HTML_HEAD: <link rel="stylesheet" type="text/css" href="http://thomasf.github.io/solarized-css/solarized-light.min.css" />
+#+HTML_HEAD: <link rel="stylesheet" href="http://dakrone.github.io/org.css" type="text/css" />
+
+* few examples of export style                                     :noexport:
+: #+HTML_HEAD: <link rel="stylesheet" type="text/css" href="https://gongzhitaao.org/orgcss/org.css"/>
+: #+HTML_HEAD: <link rel="stylesheet" type="text/css" href="http://thomasf.github.io/solarized-css/solarized-light.min.css" />
 
 * load virtual env                                                 :noexport:
 ** workon the virtual environment "iatidatastore-fts" 
@@ -36,7 +41,6 @@ which pip
 - i could see the list of processes using
   : M-x list-processes
   
- 
 * setup storage                                                    :noexport:
 
 #+BEGIN_SRC python :session datastore :results output raw :exports none
@@ -51,7 +55,6 @@ os.makedirs(project_out_path, exist_ok = True)
 
 #+RESULTS:
 
-
 * Setup necessary libraries
 
 #+BEGIN_SRC sh :session datastore :results none :async
@@ -59,13 +62,13 @@ pip install requests
 pip install pandas
 pip install arrow
 pip install matplotlib
-pip install tabular
+pip install tabulate
 #+END_SRC
 
 ** review                                                         :noexport:
 - using async from ob-async 
 
-* load libraries
+* Load libraries
 
 #+BEGIN_SRC python :session datastore
 import requests as rq
@@ -76,7 +79,7 @@ from tabulate import tabulate
 
 #+RESULTS:
 
-* helper functions 
+* Define helper functions 
 
 #+BEGIN_SRC python :session datastore 
 import os
@@ -108,8 +111,8 @@ def get_hash(url):
 #+RESULTS:
 
 * Data Exploration from datastore
-
-** Explore specific activity
+** Explore Specific Activity
+*** Prepare query 
 
 #+BEGIN_SRC python :session datastore :results output
 iati_activity = "GB-GOV-1-300417-108"
@@ -138,8 +141,7 @@ print(out_json["response"]["docs"][0]["title_narrative_text"][0])
 : Funding to support Standby Partnerships in Yemen
 
 
-
-*** TODO improve the process of moving result from one src to another 
+*** TODO improve the process of moving result from one src to another :noexport:
 
 #+NAME: json_filepath
 #+BEGIN_SRC python :session datastore :results output raw
@@ -169,7 +171,7 @@ print(get_cache_filepath(get_hash(activity_query_string)))
 *** Explore transactions
 
 #+NAME: transactions
-#+BEGIN_SRC python :session datastore :results output raw :wrap SRC table
+#+BEGIN_SRC python :session datastore :results output raw
 def process_transactions(transaction_dict_array):
     loaded_transaction_dict = [json.loads(x) for x in transaction_dict_array]
     df = pd.DataFrame(data = [{
@@ -182,39 +184,52 @@ def process_transactions(transaction_dict_array):
     return(df)
 transaction_df  = process_transactions(out_json["response"]["docs"][0]["transaction"])
 transaction_df.to_csv(get_out_filepath("activity_transactions.csv"))
-print(transaction_df)
-#return(transaction_df)
-#return("hello")
+print(tabulate(transaction_df, headers = "keys", tablefmt = "orgtbl"))
 #+END_SRC
 
 #+RESULTS: transactions
-#+begin_SRC table
-iati_identifier                 type      ref      value currency
-0   GB-GOV-1-300417-108         Disbursement  8758400   18128.00      GBP
-1   GB-GOV-1-300417-108         Disbursement  8750340   28892.00      GBP
-2   GB-GOV-1-300417-108         Disbursement  8709648   23579.00      GBP
-3   GB-GOV-1-300417-108         Disbursement  8709487   45853.00      GBP
-4   GB-GOV-1-300417-108         Disbursement  8709480   44957.00      GBP
-5   GB-GOV-1-300417-108         Disbursement  8383628   31874.00      GBP
-6   GB-GOV-1-300417-108         Disbursement  8345566    1760.00      GBP
-7   GB-GOV-1-300417-108         Disbursement  8318581   25793.00      GBP
-8   GB-GOV-1-300417-108         Disbursement  8317643   25843.00      GBP
-9   GB-GOV-1-300417-108         Disbursement  8316982   10749.00      GBP
-10  GB-GOV-1-300417-108         Disbursement  8211312   26330.00      GBP
-11  GB-GOV-1-300417-108         Disbursement  8211300   14105.00      GBP
-12  GB-GOV-1-300417-108         Disbursement  8201438    9906.00      GBP
-13  GB-GOV-1-300417-108         Disbursement  8201409   21839.00      GBP
-14  GB-GOV-1-300417-108         Disbursement  8199904   13481.00      GBP
-15  GB-GOV-1-300417-108         Disbursement  8199903   11820.00      GBP
-16  GB-GOV-1-300417-108         Disbursement  8195424   -9906.00      GBP
-17  GB-GOV-1-300417-108         Disbursement  8195422  -21839.00      GBP
-18  GB-GOV-1-300417-108         Disbursement  8192114   21839.00      GBP
-19  GB-GOV-1-300417-108         Disbursement  8192115    9906.00      GBP
-20  GB-GOV-1-300417-108  Outgoing Commitment   REFCO3   41402.00      GBP
-21  GB-GOV-1-300417-108  Outgoing Commitment   REFCO2  228170.00      GBP
-22  GB-GOV-1-300417-108  Outgoing Commitment   REFCO1  104056.00      GBP
-#+end_SRC
+|    | iati_identifier     | type                |     ref |  value | currency |
+|----+---------------------+---------------------+---------+--------+----------|
+|  0 | GB-GOV-1-300417-108 | Disbursement        | 8758400 |  18128 | GBP      |
+|  1 | GB-GOV-1-300417-108 | Disbursement        | 8750340 |  28892 | GBP      |
+|  2 | GB-GOV-1-300417-108 | Disbursement        | 8709648 |  23579 | GBP      |
+|  3 | GB-GOV-1-300417-108 | Disbursement        | 8709487 |  45853 | GBP      |
+|  4 | GB-GOV-1-300417-108 | Disbursement        | 8709480 |  44957 | GBP      |
+|  5 | GB-GOV-1-300417-108 | Disbursement        | 8383628 |  31874 | GBP      |
+|  6 | GB-GOV-1-300417-108 | Disbursement        | 8345566 |   1760 | GBP      |
+|  7 | GB-GOV-1-300417-108 | Disbursement        | 8318581 |  25793 | GBP      |
+|  8 | GB-GOV-1-300417-108 | Disbursement        | 8317643 |  25843 | GBP      |
+|  9 | GB-GOV-1-300417-108 | Disbursement        | 8316982 |  10749 | GBP      |
+| 10 | GB-GOV-1-300417-108 | Disbursement        | 8211312 |  26330 | GBP      |
+| 11 | GB-GOV-1-300417-108 | Disbursement        | 8211300 |  14105 | GBP      |
+| 12 | GB-GOV-1-300417-108 | Disbursement        | 8201438 |   9906 | GBP      |
+| 13 | GB-GOV-1-300417-108 | Disbursement        | 8201409 |  21839 | GBP      |
+| 14 | GB-GOV-1-300417-108 | Disbursement        | 8199904 |  13481 | GBP      |
+| 15 | GB-GOV-1-300417-108 | Disbursement        | 8199903 |  11820 | GBP      |
+| 16 | GB-GOV-1-300417-108 | Disbursement        | 8195424 |  -9906 | GBP      |
+| 17 | GB-GOV-1-300417-108 | Disbursement        | 8195422 | -21839 | GBP      |
+| 18 | GB-GOV-1-300417-108 | Disbursement        | 8192114 |  21839 | GBP      |
+| 19 | GB-GOV-1-300417-108 | Disbursement        | 8192115 |   9906 | GBP      |
+| 20 | GB-GOV-1-300417-108 | Outgoing Commitment |  REFCO3 |  41402 | GBP      |
+| 21 | GB-GOV-1-300417-108 | Outgoing Commitment |  REFCO2 | 228170 | GBP      |
+| 22 | GB-GOV-1-300417-108 | Outgoing Commitment |  REFCO1 | 104056 | GBP      |
 
+**** Transactions by type
+#+BEGIN_SRC python :session datastore :results output raw
+transaction_df["value"] = pd.to_numeric(transaction_df["value"])
+print(tabulate(transaction_df.groupby("type").agg({'iati_identifier':'count','value':'sum'}).rename(columns={"iati_identifier":"instances"}),
+              headers = "keys",
+              tablefmt="orgtbl"))
+  
+#+END_SRC
+
+#+RESULTS:
+| type                | instances |  value |
+|---------------------+-----------+--------|
+| Disbursement        |        20 | 354909 |
+| Outgoing Commitment |         3 | 373628 |
+
+**** Exploring in R from python                                 :noexport:
 #+NAME: R_out
 #+BEGIN_SRC R :session rsession :exports results :results output 
 library(tidyverse)
@@ -266,7 +281,7 @@ df %>%
 [[file:out.png]]
 
 
-*** issue with org result output
+*** issue with org result output                                 :noexport:
 
 - to enable inline image, the following line is added in config
   
@@ -304,10 +319,7 @@ options(crayon.enabled = FALSE)
 - [[https://emacs.stackexchange.com/questions/39011/accented-characters-not-showing-correctly-in-org-mode-html-export]]
 
   
-
-
 ** Explore Publisher
-
 *** Prepare query 
 - Preparing query to get all the activities data of the publisher
 
@@ -330,20 +342,19 @@ print(f"{publisher_query_string.replace(' ', '%20')}")
 - Get the data from the cache if available, else make an API call
 
 #+BEGIN_SRC python :session datastore :results output :results:raw 
-out_json = json.loads(get_data(publisher_query_string))
-print(out_json["response"]["numFound"])
-print(out_json["responseHeader"]["params"]["rows"])
+publisher_out_json = json.loads(get_data(publisher_query_string))
+print(publisher_out_json["response"]["numFound"])
+print(publisher_out_json["responseHeader"]["params"]["rows"])
 #+END_SRC
 
 #+RESULTS:
-: True
+: False
 : 19278
 : 19278
 
- 
 *** Explore All Transactions
 
-**** Transaction Structure 
+**** Format json data in src                                    :noexport:
 - to format json, open the src in buffer
 : C-c '
 - then issue format command
@@ -351,9 +362,9 @@ print(out_json["responseHeader"]["params"]["rows"])
 - then come back to file by using
 : C-c '
 
+**** Transaction Structure
 #+BEGIN_SRC python :session datastore :results output raw replace :wrap src json
-# print(json.dumps(out_json["response"]["docs"][0]["transaction"][0]))
-print(out_json["response"]["docs"][0]["transaction"][0])
+print(publisher_out_json["response"]["docs"][0]["transaction"][0])
 #+END_SRC
 
 #+RESULTS:
@@ -392,7 +403,6 @@ print(out_json["response"]["docs"][0]["transaction"][0])
         ],
         "receiver_activity_id": null,
         "receiver_activity": null,
-
         "type": null,
         "ref": "Not available"
     },
@@ -437,12 +447,11 @@ print(out_json["response"]["docs"][0]["transaction"][0])
 }
 #+end_src
 
-
 **** Prepare transaction
 
 #+BEGIN_SRC python :session datastore :results output raw replace
 publisher_transactions_list = []
-for x in out_json["response"]["docs"]:
+for x in publisher_out_json["response"]["docs"]:
     if 'transaction' in x:
         publisher_transactions_list.append(process_transactions(x['transaction']))
 #publisher_transactions_list = [process_transactions(x['transaction']) if 'transacion' in x else "" for x in out_json['response']['docs']]
@@ -453,6 +462,25 @@ publisher_transactions_df.to_csv(get_out_filepath("publishers_transactions.csv")
 #+RESULTS:
 
 **** Group by transaction types
+
+#+BEGIN_SRC python :session datastore :results output raw
+publisher_transactions_df["value"] = pd.to_numeric(publisher_transactions_df["value"])
+print(tabulate(publisher_transactions_df.groupby("type").agg({'iati_identifier':'count','value':'sum'}).rename(columns={"iati_identifier":"instances"}),
+              headers = "keys",
+              tablefmt="orgtbl",
+              floatfmt=("", ".0f",".2f")))
+#+END_SRC
+
+#+RESULTS:
+| type                | instances |          value |
+|---------------------+-----------+----------------|
+| Disbursement        |     95136 | 79592134014.00 |
+| Expenditure         |     54145 | 17913803669.00 |
+| Interest Payment    |        23 |     -681543.00 |
+| Outgoing Commitment |     14084 | 58484408675.00 |
+| Purchase of Equity  |       126 |  3275344889.00 |
+
+***** R implementation                                         :noexport:
 
 #+BEGIN_SRC R :session rsession :results output replace
 p_transactions_csv <- here::here("iati-fts-datastore", "cache","publishers_transactions.csv")
@@ -475,7 +503,7 @@ p_transactions_df %>%
 5 Purchase of Equity   3275344889   126
 #+end_example
 
-**** Check currency
+**** Check currency                                             :noexport:
 
 #+BEGIN_SRC R :session rsession :results output raw replace
 p_transactions_df %>%
@@ -550,249 +578,149 @@ humanitarian
 
 *** Explore by recipient countries
 
-#+BEGIN_SRC python :session datastore :results output raw replace :wrap EXPORT output
+**** Extract Country codelist
+#+BEGIN_SRC python :session datastore :results output raw replace
 from io import StringIO
 s = get_data("http://reference.iatistandard.org/203/codelists/downloads/clv1/codelist/Country.csv")
 cl_country = pd.read_csv(StringIO(s))
 cl_country = cl_country.drop(cl_country.columns[[2,3,4,5,6]], axis=1)
-print(cl_country.shape)
-print(cl_country.dtypes)
 #+END_SRC
 
 #+RESULTS:
-#+begin_EXPORT output
-True
-(251, 2)
-code    object
-name    object
-dtype: object
-#+end_EXPORT
 
-#+BEGIN_SRC python :session datastore :results output raw replace :wrap EXPORT output
+**** Activities count by recipient countries
+#+BEGIN_SRC python :session datastore :results output raw replace :wrap out
 activity_country_df = pd.DataFrame(data = [{
     'iati_identifier': act['iati_identifier'],
     'recipient_country_code': act['recipient_country_code'] if "recipient_country_code" in act else ""
-} for act in out_json["response"]["docs"]])
+} for act in publisher_out_json["response"]["docs"]])
 activity_country_df = activity_country_df.explode('recipient_country_code')
 # activity_df.to_csv("cache/publisher_activity_row.csv")
 # print(activity_country_df.shape)
 activity_country_frames = pd.merge(left = activity_country_df, right = cl_country, how = "left", left_on = "recipient_country_code", right_on = "code")
+#print(activity_country_frames.fillna(' NA (missing country)').groupby('name').count()["iati_identifier"])
 
-pd.set_option('display.max_rows', None)
-print(activity_country_frames.fillna(' NA (missing country)').groupby('name').count()["iati_identifier"])
-
-# print(activity_country_df.groupby('recipient_country_code').count())
-pd.set_option('display.max_rows', 10)
+print(tabulate(activity_country_frames.fillna(' NA').groupby('name').agg({'code':'count'}).rename(columns = {"code":"count"}),
+headers = "keys",
+tablefmt = "orgtbl"))
 #+END_SRC
 
 #+RESULTS:
-#+begin_EXPORT output
-name
- NA (missing country)                                           11
-Afghanistan                                                     34
-Albania                                                          7
-Algeria                                                          9
-American Samoa                                                   1
-Andorra                                                          1
-Angola                                                           6
-Antigua and Barbuda                                              6
-Argentina                                                        9
-Armenia                                                         12
-Australia                                                        2
-Austria                                                          2
-Azerbaijan                                                       5
-Bahrain                                                          2
-Bangladesh                                                     138
-Barbados                                                         3
-Belarus                                                          6
-Belgium                                                          2
-Belize                                                           9
-Benin                                                           28
-Bhutan                                                          50
-Bolivia (Plurinational State of)                                25
-Bosnia and Herzegovina                                           8
-Botswana                                                        17
-Brazil                                                          11
-Brunei Darussalam                                                1
-Bulgaria                                                         2
-Burkina Faso                                                    34
-Burundi                                                         20
-Cabo Verde                                                       4
-Cambodia                                                        58
-Cameroon                                                        21
-Canada                                                          14
-Cayman Islands (the)                                             1
-Central African Republic (the)                                   5
-Chad                                                            19
-Chile                                                           10
-China                                                           25
-Colombia                                                        26
-Comoros (the)                                                    5
-Congo (the Democratic Republic of the)                          38
-Congo (the)                                                     10
-Cook Islands (the)                                               3
-Costa Rica                                                       9
-Croatia                                                          2
-Cuba                                                             9
-CuraÃ§ao                                                         2
-Cyprus                                                           1
-CÃ´te d'Ivoire                                                  13
-Denmark                                                          1
-Djibouti                                                         9
-Dominica                                                         4
-Dominican Republic (the)                                         6
-Ecuador                                                         12
-Egypt                                                           12
-El Salvador                                                     12
-Equatorial Guinea                                                2
-Eritrea                                                          6
-Estonia                                                          3
-Eswatini                                                        16
-Ethiopia                                                        66
-Fiji                                                            12
-Finland                                                          2
-France                                                           3
-French Guiana                                                    1
-Gabon                                                            5
-Gambia (the)                                                    12
-Georgia                                                         18
-Germany                                                          3
-Ghana                                                           46
-Greece                                                           4
-Grenada                                                          5
-Guam                                                             2
-Guatemala                                                       22
-Guinea                                                          13
-Guinea-Bissau                                                    3
-Guyana                                                          13
-Haiti                                                           21
-Honduras                                                        20
-Hong Kong                                                        1
-Hungary                                                          4
-Iceland                                                          1
-India                                                           91
-Indonesia                                                       46
-Iran (Islamic Republic of)                                       4
-Iraq                                                            12
-Ireland                                                          1
-Israel                                                           3
-Jamaica                                                          9
-Japan                                                            2
-Jordan                                                          20
-Kazakhstan                                                       9
-Kenya                                                           61
-Kiribati                                                         2
-Korea (the Democratic People's Republic of)                      3
-Korea (the Republic of)                                          2
-Kosovo                                                           3
-Kuwait                                                           3
-Kyrgyzstan                                                      14
-Lao People's Democratic Republic (the)                          40
-Latvia                                                           2
-Lebanon                                                         12
-Lesotho                                                         18
-Liberia                                                         21
-Libya                                                            6
-Liechtenstein                                                    1
-Lithuania                                                        3
-Luxembourg                                                       2
-Madagascar                                                      18
-Malawi                                                          50
-Malaysia                                                        15
-Maldives                                                        15
-Mali                                                            34
-Malta                                                            2
-Marshall Islands (the)                                           2
-Mauritania                                                      11
-Mauritius                                                        3
-Mexico                                                          11
-Micronesia (Federated States of)                                 4
-Moldova (the Republic of)                                        8
-Monaco                                                           1
-Mongolia                                                        24
-Montenegro                                                       3
-Montserrat                                                       2
-Morocco                                                         14
-Mozambique                                                      41
-Myanmar                                                         68
-Nauru                                                            1
-Nepal                                                         5728
-Netherlands (the)                                                5
-New Zealand                                                      3
-Nicaragua                                                       18
-Niger (the)                                                     26
-Nigeria                                                         30
-Niue                                                             1
-North Macedonia                                                  8
-Norway                                                           5
-Oman                                                             3
-Pakistan                                                        88
-Palau                                                            2
-Palestine, State of                                             11
-Panama                                                           5
-Papua New Guinea                                                11
-Paraguay                                                        10
-Peru                                                            35
-Philippines (the)                                               37
-Poland                                                           3
-Portugal                                                         2
-Qatar                                                            3
-Romania                                                          2
-Russian Federation (the)                                         6
-Rwanda                                                          28
-Saint Helena, Ascension and Tristan da Cunha                     1
-Saint Kitts and Nevis                                            2
-Saint Lucia                                                      6
-Saint Vincent and the Grenadines                                 3
-Samoa                                                            6
-Sao Tome and Principe                                            4
-Saudi Arabia                                                     2
-Senegal                                                         38
-Serbia                                                           5
-Seychelles                                                       3
-Sierra Leone                                                    34
-Singapore                                                        1
-Slovakia                                                         3
-Slovenia                                                         1
-Solomon Islands                                                  7
-Somalia                                                         16
-South Africa                                                    29
-South Sudan                                                     23
-Spain                                                            3
-Sri Lanka                                                       73
-Sudan (the)                                                     19
-Suriname                                                        10
-Sweden                                                           4
-Switzerland                                                      3
-Syrian Arab Republic                                            13
-Tajikistan                                                      14
-Tanzania, United Republic of                                    57
-Thailand                                                        26
-Timor-Leste                                                     11
-Togo                                                            13
-Tokelau                                                          1
-Tonga                                                            5
-Trinidad and Tobago                                              6
-Tunisia                                                         14
-Turkey                                                           8
-Turkmenistan                                                     1
-Tuvalu                                                           9
-Uganda                                                          65
-Ukraine                                                         18
-United Arab Emirates (the)                                       1
-United Kingdom of Great Britain and Northern Ireland (the)       9
-United States of America (the)                                   3
-Uruguay                                                          4
-Uzbekistan                                                       3
-Vanuatu                                                          8
-Venezuela (Bolivarian Republic of)                               3
-Viet Nam                                                        33
-Wallis and Futuna                                                1
-Yemen                                                           21
-Zambia                                                          42
-Zimbabwe                                                        34
-Name: iati_identifier, dtype: int64
-#+end_EXPORT
+#+begin_out
+| name                                                       |   count |
+|------------------------------------------------------------+---------|
+| NA                                                         |    7512 |
+| Afghanistan                                                |     455 |
+| Albania                                                    |      10 |
+| American Samoa                                             |       2 |
+| Angola                                                     |      16 |
+| Armenia                                                    |       8 |
+| Bahamas (the)                                              |       2 |
+| Bahrain                                                    |       2 |
+| Bangladesh                                                 |     470 |
+| Benin                                                      |       2 |
+| Bosnia and Herzegovina                                     |      53 |
+| Brazil                                                     |      15 |
+| Burkina Faso                                               |       5 |
+| Burundi                                                    |      81 |
+| Cabo Verde                                                 |       2 |
+| Cambodia                                                   |      64 |
+| Cameroon                                                   |      27 |
+| Central African Republic (the)                             |      44 |
+| Chad                                                       |      13 |
+| Chile                                                      |       3 |
+| China                                                      |      98 |
+| Colombia                                                   |       1 |
+| Congo (the Democratic Republic of the)                     |     323 |
+| Congo (the)                                                |       4 |
+| Cuba                                                       |       2 |
+| CÃ´te d'Ivoire                                             |      10 |
+| Dominica                                                   |       9 |
+| Ecuador                                                    |       3 |
+| Egypt                                                      |      17 |
+| Eritrea                                                    |      14 |
+| Ethiopia                                                   |     533 |
+| Fiji                                                       |       2 |
+| Gambia (the)                                               |      20 |
+| Georgia                                                    |       8 |
+| Ghana                                                      |     350 |
+| Greece                                                     |       7 |
+| Guatemala                                                  |       5 |
+| Guinea                                                     |       2 |
+| Guyana                                                     |      24 |
+| Haiti                                                      |      54 |
+| Honduras                                                   |       2 |
+| India                                                      |     442 |
+| Indonesia                                                  |     157 |
+| Iran (Islamic Republic of)                                 |       1 |
+| Iraq                                                       |      79 |
+| Jamaica                                                    |      41 |
+| Japan                                                      |       4 |
+| Jordan                                                     |     101 |
+| Kenya                                                      |     530 |
+| Kosovo                                                     |      65 |
+| Kyrgyzstan                                                 |      56 |
+| Lao People's Democratic Republic (the)                     |      11 |
+| Lebanon                                                    |      94 |
+| Lesotho                                                    |      26 |
+| Liberia                                                    |      64 |
+| Libya                                                      |      85 |
+| Madagascar                                                 |       7 |
+| Malawi                                                     |     434 |
+| Maldives                                                   |       2 |
+| Mali                                                       |      11 |
+| Mauritania                                                 |       2 |
+| Moldova (the Republic of)                                  |      48 |
+| Mongolia                                                   |       2 |
+| Montserrat                                                 |     198 |
+| Mozambique                                                 |     316 |
+| Myanmar                                                    |     300 |
+| Nepal                                                      |     446 |
+| Nicaragua                                                  |      11 |
+| Niger (the)                                                |      10 |
+| Nigeria                                                    |     509 |
+| Pakistan                                                   |     564 |
+| Palestine, State of                                        |     191 |
+| Papua New Guinea                                           |       6 |
+| Peru                                                       |       8 |
+| Philippines (the)                                          |      17 |
+| Pitcairn                                                   |      36 |
+| Russian Federation (the)                                   |      12 |
+| Rwanda                                                     |     298 |
+| Saint Helena, Ascension and Tristan da Cunha               |     177 |
+| Saint Lucia                                                |       2 |
+| Samoa                                                      |       2 |
+| Senegal                                                    |       6 |
+| Serbia                                                     |      44 |
+| Sierra Leone                                               |     494 |
+| Solomon Islands                                            |       4 |
+| Somalia                                                    |     398 |
+| South Africa                                               |      95 |
+| South Sudan                                                |     275 |
+| Sri Lanka                                                  |      48 |
+| Sudan (the)                                                |     298 |
+| Syrian Arab Republic                                       |     190 |
+| Tajikistan                                                 |     119 |
+| Tanzania, United Republic of                               |     462 |
+| Thailand                                                   |       2 |
+| Timor-Leste                                                |       2 |
+| Togo                                                       |       2 |
+| Tunisia                                                    |       5 |
+| Turkey                                                     |      17 |
+| Turks and Caicos Islands (the)                             |      15 |
+| Uganda                                                     |     389 |
+| Ukraine                                                    |      64 |
+| United Arab Emirates (the)                                 |       2 |
+| United Kingdom of Great Britain and Northern Ireland (the) |      16 |
+| Uzbekistan                                                 |       2 |
+| Vanuatu                                                    |       4 |
+| Venezuela (Bolivarian Republic of)                         |       4 |
+| Viet Nam                                                   |      98 |
+| Virgin Islands (British)                                   |       2 |
+| Yemen                                                      |     201 |
+| Zambia                                                     |     300 |
+| Zimbabwe                                                   |     239 |
+#+end_out
 
 ** Explore Country
 *** Prepare query 
@@ -808,16 +736,18 @@ country_url = (f"https://iati.cloud/search/activity?q=" # return activitiy
         f"&wt=json" # in JSON format
         f"&rows=5721") # and return a given number of rows
 print(f"{country_url.replace(' ', '%20')}")
+print(get_hash(country_url))
 #+END_SRC
 
 #+RESULTS:
 : https://iati.cloud/search/activity?q=recipient_country_code:NP%20&fl=iati_identifier,title_narrative_text,description_narrative_text,humanitarian,reporting_org_ref,reporting_org_narrative,activity_date_start_planned,activity_date_start_actual,activity_date_end_planned,activity_date_end_actual,activity_status_code,transaction,budget,recipient_country_code&wt=json&rows=5721
+: efc00cba3a9ae28eb825c3e988ba3f3f
 
 *** Make API Call
 #+BEGIN_SRC python :session datastore :results output :results:raw
-out_json = json.loads(get_data(country_url))
-print(out_json["response"]["numFound"])
-print(out_json["response"]["docs"][0]["title_narrative_text"][0])
+country_out_json = json.loads(get_data(country_url))
+print(country_out_json["response"]["numFound"])
+print(country_out_json["response"]["docs"][0]["title_narrative_text"][0])
 #+END_SRC
 
 #+RESULTS:
@@ -827,7 +757,7 @@ print(out_json["response"]["docs"][0]["title_narrative_text"][0])
 
 *** Activity Structure 
 #+BEGIN_SRC python :session datastore :results output raw :wrap SRC json
-print(json.dumps(out_json["response"]["docs"][0]))
+print(json.dumps(country_out_json["response"]["docs"][0]))
 #+END_SRC
 
 #+RESULTS:
@@ -858,238 +788,233 @@ print(json.dumps(out_json["response"]["docs"][0]))
 
 *** Publishers
 
-#+BEGIN_SRC python :session datastore :results output raw replace :exports both :wrap SRC output
+#+BEGIN_SRC python :session datastore :results output raw replace :exports both 
 countrywise_activities_df = pd.DataFrame([{
     "iati_identifier": act["iati_identifier"],
     "reporting_org": act["reporting_org_narrative"][0],
     "humanitarian": act["humanitarian"]
-} for act in out_json["response"]["docs"]])
-print(countrywise_activities_df.shape)
+} for act in country_out_json["response"]["docs"]])
 #+END_SRC
 
 #+RESULTS:
-#+begin_SRC output
-(5721, 3)
-#+end_SRC
 
 **** Reporting org
 
-#+BEGIN_SRC python :session datastore :results output raw replace :wrap SRC output
-pd.set_option('display.max_rows', None)
-print(countrywise_activities_df.groupby("reporting_org").count()["iati_identifier"])
-pd.set_option('display.max_rows', 10)
+#+BEGIN_SRC python :session datastore :results output raw replace :wrap out
+print(tabulate(countrywise_activities_df.groupby("reporting_org").agg({"humanitarian":"count"}).rename(columns = {"humanitarian":"count"}),
+headers = "keys",
+tablefmt = "orgtbl"))
 #+END_SRC
 
 #+RESULTS:
-#+begin_SRC output
-reporting_org
-Aapasi Sahayog Kendra Syangja Nepal (ASK Nepal)                                                                  2
-Adam Smith International Limited                                                                                 1
-Age International UK (HelpAge International UK)                                                                  2
-Aidsfonds - Soa Aids Nederland                                                                                  11
-Anti-Slavery International                                                                                       1
-Asian Development Bank                                                                                          76
-Australia - Department of  Foreign Affairs and Trade                                                           178
-Avocats Sans Frontières                                                                                          2
-BBC Media Action                                                                                                 3
-BRITISH COUNCIL                                                                                                  2
-Backward Society Education (BASE)                                                                               14
-BasicNeeds                                                                                                       1
-British Red Cross                                                                                                5
-Burns Violence Survivors - Nepal                                                                                 1
-CARE International UK                                                                                            7
-CARE Nepal                                                                                                       3
-CATHOLIC RELIEF SERVICES                                                                                         2
-CDC Group plc                                                                                                    1
-Canada - International Development Research Centre/Centre de recherches pour le développement international     72
-Cardno Emerging Markets                                                                                          1
-Carers Worldwide                                                                                                 1
-Catholic Agency for Overseas Development                                                                         1
-Center for Research on Environment Health and Population Activities (CREHPA)                                     1
-ChildHopeUK                                                                                                      1
-Christian Aid                                                                                                   32
-Coffey International Development Limited, a Tetra Tech Company                                                   3
-Concern Worldwide                                                                                                1
-Concern Worldwide UK                                                                                             1
-Crown Agents Limited                                                                                             5
-DAI Europe                                                                                                       2
-DECP                                                                                                             1
-Daria Alexeeva                                                                                                   1
-Department for Environment, Food, and Rural Affairs                                                              1
-Development Initiatives Poverty Research Limited                                                                 3
-Disability and Development Partners                                                                              2
-Disasters Emergency Committee                                                                                    1
-EMMS International                                                                                               4
-Ecorys UK                                                                                                        1
-Energy Saving Trust                                                                                              1
-Enhanced Integrated Framework                                                                                    5
-European Commission - Directorate-General for International Cooperation and Development                        451
-European Commission - Humanitarian Aid & Civil Protection                                                       58
-European Commission - Service for Foreign Policy Instruments                                                    12
-FMO                                                                                                              1
-Federal Ministry for Economic Cooperation and Development                                                       90
-Find Your Feet                                                                                                   2
-Finland - Ministry for Foreign Affairs                                                                         679
-Food and Agriculture Organization (FAO)                                                                         30
-Free Press Unlimited                                                                                             1
-Gavi, the vaccine alliance                                                                                      16
-Germany - Federal Foreign Office                                                                                14
-Girls’ Education Challenge – Fund Manager PwC                                                                    2
-Global Affairs Canada                                                                                          101
-Global Green Growth Institute (GGGI)                                                                             1
-GlobalGiving.org                                                                                               488
-Handicap International                                                                                           3
-Handicap International Federation                                                                                1
-HelpAge International                                                                                           10
-ICCO Foundation                                                                                                  2
-ICF Consulting Services Limited                                                                                  2
-IDEO.org                                                                                                         1
-IMC WORLDWIDE                                                                                                   10
-INTOSAI Development Initiative                                                                                   3
-InterAction's NGO Aid Map                                                                                      165
-International Alert                                                                                             14
-International Child Development Initiatives                                                                      2
-International Federation of the Red Cross and Red Crescent (IFRC)                                                3
-International Finance Corporation                                                                               20
-International Fund for Agricultural Development (IFAD)                                                          18
-International Labour Organization (ILO)                                                                         64
-International Network of People who Use Drugs (INPUD)                                                            1
-International Organization for Migration (IOM)                                                                   9
-International Rescue Committee Inc.                                                                              1
-Ireland - Department of Foreign Affairs and Trade                                                               18
-Itad Limited                                                                                                     1
-KPMG Advisory Limited Tanzania                                                                                   1
-Landell Mills                                                                                                    1
-Learning for Life                                                                                                1
-Mainline M&E                                                                                                     1
-Malaria Consortium                                                                                               2
-MannionDaniels                                                                                                   2
-Marie Stopes International                                                                                       1
-Mercy Corps Europe                                                                                               5
-Millennium Challenge Corporation                                                                                63
-Ministry of Foreign Affairs of  Japan                                                                            4
-Ministry of Foreign Affairs, Denmark                                                                           227
-Ministry of interior of the Slovak Republic                                                                      1
-Mondiaal FNV                                                                                                     1
-Mott MacDonald Limited                                                                                           1
-NGO Federation of Nepal                                                                                          1
-Nepal Disabled Human Rights Center                                                                               1
-Nepal Netra Jyoti Sangh                                                                                          1
-Netherlands - Ministry of Foreign Affairs                                                                        8
-Netherlands Enterprise Agency                                                                                   23
-Netherlands Red Cross                                                                                            8
-New Zealand - Ministry of Foreign Affairs and Trade - New Zealand Aid Programme                                 18
-Norad - Norwegian Agency for Development Cooperation                                                           102
-Options Consultancy Services                                                                                     2
-Orbis Charitable Trust                                                                                           1
-Orbis International                                                                                              1
-Other ministries                                                                                                 1
-Overseas Development Institute                                                                                   2
-Oxfam GB                                                                                                        83
-Oxfam Novib                                                                                                     19
-Oxford Policy Management                                                                                         5
-PHASE Worldwide                                                                                                  4
-PRACTICA Foundation                                                                                              2
-PUM Netherlands                                                                                                  1
-Palladium International Ltd (UK)                                                                                 2
-People in Need                                                                                                   7
-Plan International Netherlands                                                                                   5
-Plan International UK                                                                                            8
-PricewaterhouseCoopers Private Limited India                                                                     2
-PwC                                                                                                              2
-RAIN foundation                                                                                                  4
-RUAF Foundation                                                                                                  1
-Raleigh International                                                                                            1
-Republic of Korea                                                                                              101
-Restless Development                                                                                             1
-Rutgers                                                                                                          1
-SECOURS CATHOLIQUE - CARITAS FRANCE                                                                              3
-Saferworld                                                                                                       3
-Save the Children International                                                                                 16
-Save the Children UK                                                                                            16
-Sightsavers                                                                                                      1
-Simavi                                                                                                           5
-Slovak Aid                                                                                                       1
-Social Development Direct Limited                                                                                1
-South Asian Women Development Forum                                                                              2
-Stichting fondsbeheer DGGF lokaal MKB                                                                            1
-Street Child                                                                                                     1
-Sweden, through Swedish International Development Cooperation Agency (Sida)                                    418
-Switzerland - Swiss Agency for Development and Cooperation (SDC)                                               203
-Terre des Hommes Netherlands                                                                                     8
-The Global Fund to Fight AIDS, Tuberculosis and Malaria                                                         19
-The Global Network of People Living with HIV (GNP+)                                                              1
-The Joint United Nations Programme on HIV and AIDS (UNAIDS) Secretariat                                         20
-The Leprosy Mission England and Wales                                                                            1
-The Louis Berger Group, Inc.                                                                                     1
-The OPEC Fund for International Development (OFID)                                                              22
-The World Bank                                                                                                  42
-Trianglen                                                                                                       44
-UK - Department for Business, Energy and Industrial Strategy (BEIS)                                              1
-UK - Department for International Development (DFID)                                                           446
-UK - Department of Health (DH)                                                                                   1
-UK - Foreign & Commonwealth Office                                                                              20
-UN Pooled Funds                                                                                                 56
-UN Women                                                                                                         9
-United Mission to Nepal                                                                                          1
-United Nations Capital Development Fund                                                                         37
-United Nations Central Emergency Response Fund (CERF)                                                           67
-United Nations Development Programme (UNDP)                                                                     91
-United Nations Educational, Scientific and Cultural Organization (UNESCO)                                       36
-United Nations Environment Programme (UNEP)                                                                      2
-United Nations High Commissioner for Refugees (UNHCR)                                                            6
-United Nations Industrial Development Organization (UNIDO)                                                      10
-United Nations Office for Project Services (UNOPS)                                                               9
-United Nations Office for the Coordination of Humanitarian Affairs (OCHA)                                        1
-United Nations Population Fund                                                                                  17
-United Nations World Food Programme (WFP)                                                                       26
-United States                                                                                                  436
-University of Amsterdam                                                                                          2
-Voluntary Service Overseas                                                                                       5
-WASH Alliance International                                                                                      2
-WASTE advisers on urban environment and development                                                              1
-WSM-World Solidarity                                                                                             1
-WWF-UK                                                                                                           2
-WYG International                                                                                                1
-Water Integrity Network Association                                                                              1
-WaterAid                                                                                                         1
-Women Engage for a Common Future                                                                                 1
-Women's Refugee Commission                                                                                       1
-World Health Organization                                                                                      112
-World Vision International                                                                                       1
-World Vision UK                                                                                                  1
-YoungInnovations                                                                                                 2
-Zoological Society of London                                                                                     3
-iDE                                                                                                              3
-interburns                                                                                                       2
-kidasha                                                                                                          1
-market and employment for peace and stability                                                                    1
-Name: iati_identifier, dtype: int64
-#+end_SRC
+#+begin_out
+| reporting_org                                                                                               |   count |
+|-------------------------------------------------------------------------------------------------------------+---------|
+| Aapasi Sahayog Kendra Syangja Nepal (ASK Nepal)                                                             |       2 |
+| Adam Smith International Limited                                                                            |       1 |
+| Age International UK (HelpAge International UK)                                                             |       2 |
+| Aidsfonds - Soa Aids Nederland                                                                              |      11 |
+| Anti-Slavery International                                                                                  |       1 |
+| Asian Development Bank                                                                                      |      76 |
+| Australia - Department of  Foreign Affairs and Trade                                                        |     178 |
+| Avocats Sans Frontières                                                                                     |       2 |
+| BBC Media Action                                                                                            |       3 |
+| BRITISH COUNCIL                                                                                             |       2 |
+| Backward Society Education (BASE)                                                                           |      14 |
+| BasicNeeds                                                                                                  |       1 |
+| British Red Cross                                                                                           |       5 |
+| Burns Violence Survivors - Nepal                                                                            |       1 |
+| CARE International UK                                                                                       |       7 |
+| CARE Nepal                                                                                                  |       3 |
+| CATHOLIC RELIEF SERVICES                                                                                    |       2 |
+| CDC Group plc                                                                                               |       1 |
+| Canada - International Development Research Centre/Centre de recherches pour le développement international |      72 |
+| Cardno Emerging Markets                                                                                     |       1 |
+| Carers Worldwide                                                                                            |       1 |
+| Catholic Agency for Overseas Development                                                                    |       1 |
+| Center for Research on Environment Health and Population Activities (CREHPA)                                |       1 |
+| ChildHopeUK                                                                                                 |       1 |
+| Christian Aid                                                                                               |      32 |
+| Coffey International Development Limited, a Tetra Tech Company                                              |       3 |
+| Concern Worldwide                                                                                           |       1 |
+| Concern Worldwide UK                                                                                        |       1 |
+| Crown Agents Limited                                                                                        |       5 |
+| DAI Europe                                                                                                  |       2 |
+| DECP                                                                                                        |       1 |
+| Daria Alexeeva                                                                                              |       1 |
+| Department for Environment, Food, and Rural Affairs                                                         |       1 |
+| Development Initiatives Poverty Research Limited                                                            |       3 |
+| Disability and Development Partners                                                                         |       2 |
+| Disasters Emergency Committee                                                                               |       1 |
+| EMMS International                                                                                          |       4 |
+| Ecorys UK                                                                                                   |       1 |
+| Energy Saving Trust                                                                                         |       1 |
+| Enhanced Integrated Framework                                                                               |       5 |
+| European Commission - Directorate-General for International Cooperation and Development                     |     451 |
+| European Commission - Humanitarian Aid & Civil Protection                                                   |      58 |
+| European Commission - Service for Foreign Policy Instruments                                                |      12 |
+| FMO                                                                                                         |       1 |
+| Federal Ministry for Economic Cooperation and Development                                                   |      90 |
+| Find Your Feet                                                                                              |       2 |
+| Finland - Ministry for Foreign Affairs                                                                      |     679 |
+| Food and Agriculture Organization (FAO)                                                                     |      30 |
+| Free Press Unlimited                                                                                        |       1 |
+| Gavi, the vaccine alliance                                                                                  |      16 |
+| Germany - Federal Foreign Office                                                                            |      14 |
+| Girls’ Education Challenge – Fund Manager PwC                                                               |       2 |
+| Global Affairs Canada                                                                                       |     101 |
+| Global Green Growth Institute (GGGI)                                                                        |       1 |
+| GlobalGiving.org                                                                                            |     488 |
+| Handicap International                                                                                      |       3 |
+| Handicap International Federation                                                                           |       1 |
+| HelpAge International                                                                                       |      10 |
+| ICCO Foundation                                                                                             |       2 |
+| ICF Consulting Services Limited                                                                             |       2 |
+| IDEO.org                                                                                                    |       1 |
+| IMC WORLDWIDE                                                                                               |      10 |
+| INTOSAI Development Initiative                                                                              |       3 |
+| InterAction's NGO Aid Map                                                                                   |     165 |
+| International Alert                                                                                         |      14 |
+| International Child Development Initiatives                                                                 |       2 |
+| International Federation of the Red Cross and Red Crescent (IFRC)                                           |       3 |
+| International Finance Corporation                                                                           |      20 |
+| International Fund for Agricultural Development (IFAD)                                                      |      18 |
+| International Labour Organization (ILO)                                                                     |      64 |
+| International Network of People who Use Drugs (INPUD)                                                       |       1 |
+| International Organization for Migration (IOM)                                                              |       9 |
+| International Rescue Committee Inc.                                                                         |       1 |
+| Ireland - Department of Foreign Affairs and Trade                                                           |      18 |
+| Itad Limited                                                                                                |       1 |
+| KPMG Advisory Limited Tanzania                                                                              |       1 |
+| Landell Mills                                                                                               |       1 |
+| Learning for Life                                                                                           |       1 |
+| Mainline M&E                                                                                                |       1 |
+| Malaria Consortium                                                                                          |       2 |
+| MannionDaniels                                                                                              |       2 |
+| Marie Stopes International                                                                                  |       1 |
+| Mercy Corps Europe                                                                                          |       5 |
+| Millennium Challenge Corporation                                                                            |      63 |
+| Ministry of Foreign Affairs of  Japan                                                                       |       4 |
+| Ministry of Foreign Affairs, Denmark                                                                        |     227 |
+| Ministry of interior of the Slovak Republic                                                                 |       1 |
+| Mondiaal FNV                                                                                                |       1 |
+| Mott MacDonald Limited                                                                                      |       1 |
+| NGO Federation of Nepal                                                                                     |       1 |
+| Nepal Disabled Human Rights Center                                                                          |       1 |
+| Nepal Netra Jyoti Sangh                                                                                     |       1 |
+| Netherlands - Ministry of Foreign Affairs                                                                   |       8 |
+| Netherlands Enterprise Agency                                                                               |      23 |
+| Netherlands Red Cross                                                                                       |       8 |
+| New Zealand - Ministry of Foreign Affairs and Trade - New Zealand Aid Programme                             |      18 |
+| Norad - Norwegian Agency for Development Cooperation                                                        |     102 |
+| Options Consultancy Services                                                                                |       2 |
+| Orbis Charitable Trust                                                                                      |       1 |
+| Orbis International                                                                                         |       1 |
+| Other ministries                                                                                            |       1 |
+| Overseas Development Institute                                                                              |       2 |
+| Oxfam GB                                                                                                    |      83 |
+| Oxfam Novib                                                                                                 |      19 |
+| Oxford Policy Management                                                                                    |       5 |
+| PHASE Worldwide                                                                                             |       4 |
+| PRACTICA Foundation                                                                                         |       2 |
+| PUM Netherlands                                                                                             |       1 |
+| Palladium International Ltd (UK)                                                                            |       2 |
+| People in Need                                                                                              |       7 |
+| Plan International Netherlands                                                                              |       5 |
+| Plan International UK                                                                                       |       8 |
+| PricewaterhouseCoopers Private Limited India                                                                |       2 |
+| PwC                                                                                                         |       2 |
+| RAIN foundation                                                                                             |       4 |
+| RUAF Foundation                                                                                             |       1 |
+| Raleigh International                                                                                       |       1 |
+| Republic of Korea                                                                                           |     101 |
+| Restless Development                                                                                        |       1 |
+| Rutgers                                                                                                     |       1 |
+| SECOURS CATHOLIQUE - CARITAS FRANCE                                                                         |       3 |
+| Saferworld                                                                                                  |       3 |
+| Save the Children International                                                                             |      16 |
+| Save the Children UK                                                                                        |      16 |
+| Sightsavers                                                                                                 |       1 |
+| Simavi                                                                                                      |       5 |
+| Slovak Aid                                                                                                  |       1 |
+| Social Development Direct Limited                                                                           |       1 |
+| South Asian Women Development Forum                                                                         |       2 |
+| Stichting fondsbeheer DGGF lokaal MKB                                                                       |       1 |
+| Street Child                                                                                                |       1 |
+| Sweden, through Swedish International Development Cooperation Agency (Sida)                                 |     418 |
+| Switzerland - Swiss Agency for Development and Cooperation (SDC)                                            |     203 |
+| Terre des Hommes Netherlands                                                                                |       8 |
+| The Global Fund to Fight AIDS, Tuberculosis and Malaria                                                     |      19 |
+| The Global Network of People Living with HIV (GNP+)                                                         |       1 |
+| The Joint United Nations Programme on HIV and AIDS (UNAIDS) Secretariat                                     |      20 |
+| The Leprosy Mission England and Wales                                                                       |       1 |
+| The Louis Berger Group, Inc.                                                                                |       1 |
+| The OPEC Fund for International Development (OFID)                                                          |      22 |
+| The World Bank                                                                                              |      42 |
+| Trianglen                                                                                                   |      44 |
+| UK - Department for Business, Energy and Industrial Strategy (BEIS)                                         |       1 |
+| UK - Department for International Development (DFID)                                                        |     446 |
+| UK - Department of Health (DH)                                                                              |       1 |
+| UK - Foreign & Commonwealth Office                                                                          |      20 |
+| UN Pooled Funds                                                                                             |      56 |
+| UN Women                                                                                                    |       9 |
+| United Mission to Nepal                                                                                     |       1 |
+| United Nations Capital Development Fund                                                                     |      37 |
+| United Nations Central Emergency Response Fund (CERF)                                                       |      67 |
+| United Nations Development Programme (UNDP)                                                                 |      91 |
+| United Nations Educational, Scientific and Cultural Organization (UNESCO)                                   |      36 |
+| United Nations Environment Programme (UNEP)                                                                 |       2 |
+| United Nations High Commissioner for Refugees (UNHCR)                                                       |       6 |
+| United Nations Industrial Development Organization (UNIDO)                                                  |      10 |
+| United Nations Office for Project Services (UNOPS)                                                          |       9 |
+| United Nations Office for the Coordination of Humanitarian Affairs (OCHA)                                   |       1 |
+| United Nations Population Fund                                                                              |      17 |
+| United Nations World Food Programme (WFP)                                                                   |      26 |
+| United States                                                                                               |     436 |
+| University of Amsterdam                                                                                     |       2 |
+| Voluntary Service Overseas                                                                                  |       5 |
+| WASH Alliance International                                                                                 |       2 |
+| WASTE advisers on urban environment and development                                                         |       1 |
+| WSM-World Solidarity                                                                                        |       1 |
+| WWF-UK                                                                                                      |       2 |
+| WYG International                                                                                           |       1 |
+| Water Integrity Network Association                                                                         |       1 |
+| WaterAid                                                                                                    |       1 |
+| Women Engage for a Common Future                                                                            |       1 |
+| Women's Refugee Commission                                                                                  |       1 |
+| World Health Organization                                                                                   |     112 |
+| World Vision International                                                                                  |       1 |
+| World Vision UK                                                                                             |       1 |
+| YoungInnovations                                                                                            |       2 |
+| Zoological Society of London                                                                                |       3 |
+| iDE                                                                                                         |       3 |
+| interburns                                                                                                  |       2 |
+| kidasha                                                                                                     |       1 |
+| market and employment for peace and stability                                                               |       1 |
+#+end_out
 
 **** Activities count by humanitarian
 
-#+BEGIN_SRC python :session datastore :results output raw replace :wrap SRC output
-pd.set_option('display.max_rows', None)
-print(countrywise_activities_df.groupby("humanitarian").count()["iati_identifier"])
-pd.set_option('display.max_rows', 10)
+#+BEGIN_SRC python :session datastore :results output raw replace :wrap out
+print(tabulate(countrywise_activities_df.groupby("humanitarian").agg({"humanitarian":"count"}).rename(columns = {"humanitarian":"count"}),
+headers = "keys",
+tablefmt = "orgtbl"))
+
 #+END_SRC
 
 #+RESULTS:
-#+begin_SRC output
-humanitarian
-0    5189
-1     532
-Name: iati_identifier, dtype: int64
-#+end_SRC
+#+begin_out
+|   humanitarian |   count |
+|----------------+---------|
+|              0 |    5189 |
+|              1 |     532 |
+#+end_out
 
 **** Transactions by type
 
-***** Prepare transaction
-
 #+BEGIN_SRC python :session datastore :results output raw replace
 country_transactions_list = []
-for x in out_json["response"]["docs"]:
+for x in country_out_json["response"]["docs"]:
     if 'transaction' in x:
         country_transactions_list.append(process_transactions(x['transaction']))
 #publisher_transactions_list = [process_transactions(x['transaction']) if 'transacion' in x else "" for x in out_json['response']['docs']]
@@ -1106,7 +1031,6 @@ print(tabulate(country_transactions_df.groupby("type").agg({'iati_identifier': '
                headers="keys",
                tablefmt="orgtbl",
                floatfmt=("", ".0f",".2f")))
-
 
 #+END_SRC
 
