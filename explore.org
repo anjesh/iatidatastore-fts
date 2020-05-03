@@ -1,0 +1,1047 @@
+#+title: IATI Datastore challenge for FTS
+#+PROPERTY: header-args :eval never-export :exports both
+
+* load virtual env
+** workon the virtual environment "iatidatastore-fts" 
+: M-x pyvenv workon ; and select the right environment
+
+#+BEGIN_SRC emacs-lisp :shebang #!/bin/bash -i :session datastore :async :exports none
+; (setenv "LD_LIBRARY_PATH")
+; (pyvenv-workon "iatidatastore-fts")
+
+#+END_SRC
+
+#+RESULTS:
+
+** ensure that right environment Python 3+ is loaded 
+- the script is tested using 3.7.4
+
+#+BEGIN_SRC sh :shebang #!/bin/bash -i :session datastore :async :exports none
+echo $VIRTUAL_ENV
+which python
+python --version
+which pip
+#+END_SRC
+
+#+RESULTS:
+| /Users/anjesh/.virtualenvs/iatidatastore-fts            |       |
+| /Users/anjesh/.virtualenvs/iatidatastore-fts/bin/python |       |
+| Python                                                  | 3.7.4 |
+| /Users/anjesh/.virtualenvs/iatidatastore-fts/bin/pip    |       |
+
+** review
+- it took a while to execute virtualenv process because i wasxn't using shebang option 
+- i could see the list of processes using
+  : M-x list-processes
+  
+ 
+* setup storage 
+
+#+BEGIN_SRC python :session datastore :results output raw :exports none
+import os
+project_storage_path = os.path.join(os.path.expanduser("~"),"Workspace_storage","iatidatastore-fts")
+project_cache_path = os.path.join(project_storage_path, "cache")
+project_out_path = os.path.join(project_storage_path, "out")
+
+os.makedirs(project_cache_path, exist_ok = True)
+os.makedirs(project_out_path, exist_ok = True)
+#+END_SRC
+
+#+RESULTS:
+
+
+* Setup necessary libraries
+
+#+BEGIN_SRC sh :session datastore :results none :async
+pip install requests
+pip install pandas
+pip install arrow
+pip install matplotlib
+pip install feather-format
+#+END_SRC
+
+** review
+- using async from ob-async 
+
+* load libraries
+
+#+BEGIN_SRC python :session datastore
+import requests as rq
+import pandas as pd
+import arrow
+import matplotlib
+#+END_SRC
+
+#+RESULTS:
+
+* helper functions 
+
+#+BEGIN_SRC python :session datastore 
+import os
+import hashlib
+import json
+
+def get_data(url, cache = True):
+  cache_file = get_cache_filepath(get_hash(url))
+  print(os.path.isfile(cache_file))
+  if cache and os.path.isfile(cache_file):
+    with open(cache_file, 'r') as fp:
+      return(fp.read())
+  content = rq.get(url)
+  with open(cache_file, 'w') as fp:
+    fp.write(content.text)
+  return(content.text)
+ 
+def get_out_filepath(filename):
+  return(os.path.join(project_out_path, filename))
+
+def get_cache_filepath(filename):
+  return(os.path.join(project_cache_path, filename))
+
+def get_hash(url):
+  return(hashlib.md5(url.encode('utf-8')).hexdigest())
+  
+#+END_SRC
+
+#+RESULTS:
+
+* exploration
+
+** explore specific activity
+
+#+BEGIN_SRC python :session datastore :results output
+iati_activity = "GB-GOV-1-300417-108"
+activity_query_string = (f"https://iati.cloud/search/activity?q=" # return activitiy
+        f"iati_identifier:{iati_activity} " # that matches the given iati_identifuer
+        f"&fl=iati_identifier,title_narrative_text,description_narrative_text,humanitarian,reporting_org_ref,"
+        f"activity_date_start_planned,activity_date_start_actual,activity_date_end_planned,activity_date_end_actual,activity_status_code,"
+        f"transaction,budget" # returning the following fields 
+        f"&wt=json" # in JSON format
+        f"&rows=1") # and return a given number of rows
+print(f"{activity_query_string.replace(' ', '%20')}")
+#+END_SRC
+
+#+RESULTS:
+: https://iati.cloud/search/activity?q=iati_identifier:GB-GOV-1-300417-108%20&fl=iati_identifier,title_narrative_text,description_narrative_text,humanitarian,reporting_org_ref,activity_date_start_planned,activity_date_start_actual,activity_date_end_planned,activity_date_end_actual,activity_status_code,transaction,budget&wt=json&rows=1
+ https://iati.cloud/search/activity?q=iati_identifier:GB-GOV-1-300417-108%20&fl=iati_identifier,title_narrative_text,description_narrative_text,humanitarian,reporting_org_ref,activity_date_start_planned,activity_date_start_actual,activity_date_end_planned,activity_date_end_actual,activity_status_code,transaction,budget&wt=json&rows=1
+
+#+BEGIN_SRC python :session datastore :results output :results:raw
+out_json = json.loads(get_data(activity_query_string))
+print(out_json["response"]["numFound"])
+print(out_json["response"]["docs"][0]["title_narrative_text"][0])
+#+END_SRC
+
+#+RESULTS:
+: True
+: 1
+: Funding to support Standby Partnerships in Yemen
+
+
+#+NAME: json_filepath
+#+BEGIN_SRC python :session datastore :results output raw
+print(get_cache_filepath(get_hash(activity_query_string)))
+#+END_SRC
+
+#+RESULTS: json_filepath
+/Users/anjesh/Workspace_storage/iatidatastore-fts/cache/762ca6b3e70b0d4b75ce791b900dba37
+
+*** TODO improve the process of moving result from one src to another 
+- moving result from one src block to another and open in new buffer
+
+#+NAME: mystream
+#+BEGIN_SRC emacs-lisp :var fp=json_filepath :results none
+; (prin1 c (generate-new-buffer "json_output"))
+; (split-window-right)
+; (switch-to-buffer-other-window '"json_output")
+#+END_SRC
+
+: #<buffer json_output>
+
+- explore json file here
+
+#+BEGIN_SRC emacs-lisp :var fp=json_filepath :results none
+(switch-to-buffer (find-file fp))
+#+END_SRC
+
+*** Explore transactions
+
+#+NAME: transactions
+#+BEGIN_SRC python :session datastore :results output raw :wrap SRC table
+def process_transactions(transaction_dict_array):
+    loaded_transaction_dict = [json.loads(x) for x in transaction_dict_array]
+    df = pd.DataFrame(data = [{
+        'iati_identifier': transaction['iati_identifier'],
+        'type': transaction['transaction_type']['name'],
+        'ref': transaction['ref'],
+        'value': transaction['value'],
+        'currency': transaction['currency']['code']
+        } for transaction in loaded_transaction_dict])
+    return(df)
+transaction_df  = process_transactions(out_json["response"]["docs"][0]["transaction"])
+transaction_df.to_csv(get_out_filepath("activity_transactions.csv"))
+print(transaction_df)
+#return(transaction_df)
+#return("hello")
+#+END_SRC
+
+#+RESULTS: transactions
+#+begin_SRC table
+iati_identifier                 type      ref      value currency
+0   GB-GOV-1-300417-108         Disbursement  8758400   18128.00      GBP
+1   GB-GOV-1-300417-108         Disbursement  8750340   28892.00      GBP
+2   GB-GOV-1-300417-108         Disbursement  8709648   23579.00      GBP
+3   GB-GOV-1-300417-108         Disbursement  8709487   45853.00      GBP
+4   GB-GOV-1-300417-108         Disbursement  8709480   44957.00      GBP
+5   GB-GOV-1-300417-108         Disbursement  8383628   31874.00      GBP
+6   GB-GOV-1-300417-108         Disbursement  8345566    1760.00      GBP
+7   GB-GOV-1-300417-108         Disbursement  8318581   25793.00      GBP
+8   GB-GOV-1-300417-108         Disbursement  8317643   25843.00      GBP
+9   GB-GOV-1-300417-108         Disbursement  8316982   10749.00      GBP
+10  GB-GOV-1-300417-108         Disbursement  8211312   26330.00      GBP
+11  GB-GOV-1-300417-108         Disbursement  8211300   14105.00      GBP
+12  GB-GOV-1-300417-108         Disbursement  8201438    9906.00      GBP
+13  GB-GOV-1-300417-108         Disbursement  8201409   21839.00      GBP
+14  GB-GOV-1-300417-108         Disbursement  8199904   13481.00      GBP
+15  GB-GOV-1-300417-108         Disbursement  8199903   11820.00      GBP
+16  GB-GOV-1-300417-108         Disbursement  8195424   -9906.00      GBP
+17  GB-GOV-1-300417-108         Disbursement  8195422  -21839.00      GBP
+18  GB-GOV-1-300417-108         Disbursement  8192114   21839.00      GBP
+19  GB-GOV-1-300417-108         Disbursement  8192115    9906.00      GBP
+20  GB-GOV-1-300417-108  Outgoing Commitment   REFCO3   41402.00      GBP
+21  GB-GOV-1-300417-108  Outgoing Commitment   REFCO2  228170.00      GBP
+22  GB-GOV-1-300417-108  Outgoing Commitment   REFCO1  104056.00      GBP
+#+end_SRC
+
+#+NAME: R_out
+#+BEGIN_SRC R :session rsession :exports results :results output 
+library(tidyverse)
+file <- here::here("iati-fts-datastore","cache","transactions.csv")
+df <- read.csv(file)
+str(df)
+#+END_SRC
+
+#+RESULTS: R_out
+#+begin_example
+
+'data.frame':	23 obs. of  6 variables:
+ $ X              : int  0 1 2 3 4 5 6 7 8 9 ...
+ $ iati_identifier: chr  "GB-GOV-1-300417-108" "GB-GOV-1-300417-108" "GB-GOV-1-300417-108" "GB-GOV-1-300417-108" ...
+ $ type           : chr  "Disbursement" "Disbursement" "Disbursement" "Disbursement" ...
+ $ ref            : chr  "8758400" "8750340" "8709648" "8709487" ...
+ $ value          : num  18128 28892 23579 45853 44957 ...
+ $ currency       : chr  "GBP" "GBP" "GBP" "GBP" ...
+
+[1] "/Users/anjesh/Workspace"
+#+end_example
+
+#+BEGIN_SRC R :session rsession :results output replace
+df %>%
+  group_by(type) %>%
+  summarize(val = sum(value)) 
+
+#+END_SRC
+
+#+RESULTS:
+: 
+: # A tibble: 2 x 2
+:   type                   val
+:   <
+:                <dbl>
+: 1 Disbursement        354909
+: 2 Outgoing Commitment 373628
+
+#+BEGIN_SRC R :session rsession :results output graphics file :file out.png :exports code :height 200
+df %>%
+  group_by(type) %>%
+  summarize(val = sum(value)) %>%
+  ggplot(aes(x=type, y=val)) +
+  geom_bar(stat = "identity")
+
+#+END_SRC
+
+#+RESULTS:
+[[file:out.png]]
+
+
+*** issue with org result output
+
+- to enable inline image, the following line is added in config
+  
+: (add-hook 'org-babel-after-execute-hook 'org-display-inline-images 'append)
+
+
+- the R output shows char like following
+: [90m# A tibble: 2 x 2[39m
+
+- created .RProfile with the following line solved 
+#+BEGIN_SRC R
+options(crayon.enabled = FALSE)
+#+END_SRC
+
+
+#+BEGIN_SRC emacs-lisp
+(setenv "LANG" "en_US.UTF-8")
+(setenv "LC_ALL" "en_US.UTF-8")
+(prefer-coding-system 'utf-8)
+(set-default-coding-systems 'utf-8)
+(set-terminal-coding-system 'utf-8)
+(set-keyboard-coding-system 'utf-8)
+(setq locale-coding-system 'utf-8)
+(set-selection-coding-system 'utf-8)
+(prefer-coding-system 'utf-8)
+(set-default-coding-systems 'utf-8)
+(set-terminal-coding-system 'utf-8)
+(set-keyboard-coding-system 'utf-8)
+#+END_SRC
+
+#+RESULTS:
+: utf-8-unix
+
+**** references
+- [[https://emacs.stackexchange.com/questions/39011/accented-characters-not-showing-correctly-in-org-mode-html-export]]
+
+  
+
+
+** Explore Publisher
+
+*** Prepare query 
+- Preparing query to get all the activities data of the publisher
+
+#+BEGIN_SRC python :session datastore :results output
+iati_publisher = "GB-GOV-1"
+publisher_query_string = (f"https://iati.cloud/search/activity?q=" # return activitiy
+        f"reporting_org_ref:{iati_publisher} " # that matches the given iati_publisher
+        f"&fl=iati_identifier,title_narrative_text,description_narrative_text,humanitarian,reporting_org_ref,"
+        f"activity_date_start_planned,activity_date_start_actual,activity_date_end_planned,activity_date_end_actual,activity_status_code,"
+        f"transaction,budget,recipient_country_code" # returning the following fields 
+        f"&wt=json" # in JSON format
+        f"&rows=19278") # and return a given number of rows
+print(f"{publisher_query_string.replace(' ', '%20')}")
+#+END_SRC
+
+#+RESULTS:
+: https://iati.cloud/search/activity?q=reporting_org_ref:GB-GOV-1%20&fl=iati_identifier,title_narrative_text,description_narrative_text,humanitarian,reporting_org_ref,activity_date_start_planned,activity_date_start_actual,activity_date_end_planned,activity_date_end_actual,activity_status_code,transaction,budget,recipient_country_code&wt=json&rows=19278
+https://iati.cloud/search/activity?q=reporting_org_ref:GB-GOV-1%20&fl=iati_identifier,title_narrative_text,description_narrative_text,humanitarian,reporting_org_ref,activity_date_start_planned,activity_date_start_actual,activity_date_end_planned,activity_date_end_actual,activity_status_code,transaction,budget,recipient_country_code&wt=json&rows=1
+
+*** Making API Call
+- Get the data from the cache if available, else make an API call
+
+#+BEGIN_SRC python :session datastore :results output :results:raw 
+out_json = json.loads(get_data(publisher_query_string))
+print(out_json["response"]["numFound"])
+print(out_json["responseHeader"]["params"]["rows"])
+#+END_SRC
+
+#+RESULTS:
+: True
+: 19278
+: 19278
+
+ 
+*** Explore All Transactions
+
+**** Transaction Structure 
+- to format json, open the src in buffer
+: C-c '
+- then issue format command
+: C-c C-f ; as defined in https://github.com/joshwnj/json-mode
+- then come back to file by using
+: C-c '
+
+#+BEGIN_SRC python :session datastore :results output raw replace :wrap src json
+# print(json.dumps(out_json["response"]["docs"][0]["transaction"][0]))
+print(out_json["response"]["docs"][0]["transaction"][0])
+#+END_SRC
+
+#+RESULTS:
+#+begin_src json
+{
+    "recipient_regions": [],
+    "recipient_countries": [],
+    "iati_identifier": "GB-1-204310-101",
+    "sectors": [],
+    "tied_status": {
+        "name": "Untied",
+        "code": "5"
+    },
+    "aid_type": null,
+    "finance_type": {
+        "name": "Standard grant",
+        "code": "110"
+    },
+    "flow_type": {
+        "name": "ODA",
+        "code": "10"
+    },
+    "recipient_region": null,
+    "recipient_country": null,
+    "sector": null,
+    "disbursement_channel": null,
+    "receiver_organisation": {
+        "narratives": [
+            {
+                "language": {
+                    "name": "English",
+                    "code": "en"
+                },
+                "text": "Correction"
+            }
+        ],
+        "receiver_activity_id": null,
+        "receiver_activity": null,
+        "type": null,
+        "ref": "Not available"
+    },
+    "provider_organisation": {
+        "narratives": [
+            {
+                "language": {
+                    "name": "English",
+                    "code": "en"
+                },
+                "text": "UK - Department for International Development (DFID)"
+            }
+        ],
+        "provider_activity_id": null,
+        "type": null,
+        "ref": "GB-GOV-1"
+    },
+    "description": {
+        "narratives": [
+            {
+                "language": {
+                    "name": "English",
+                    "code": "en"
+                },
+                "text": "Technical & Advisory services"
+            }
+        ]
+    },
+    "currency": {
+        "name": "Pound Sterling",
+        "code": "GBP"
+    },
+    "value_date": "2014-07-11",
+    "value": "-300000.00",
+    "transaction_date": "2014-07-11",
+    "transaction_type": {
+        "name": "Expenditure",
+        "code": "4"
+    },
+    "humanitarian": null,
+    "ref": "5926209"
+}
+#+end_src
+
+
+**** Prepare transaction
+
+#+BEGIN_SRC python :session datastore :results output raw replace
+publisher_transactions_list = []
+for x in out_json["response"]["docs"]:
+    if 'transaction' in x:
+        publisher_transactions_list.append(process_transactions(x['transaction']))
+#publisher_transactions_list = [process_transactions(x['transaction']) if 'transacion' in x else "" for x in out_json['response']['docs']]
+publisher_transactions_df = pd.concat(publisher_transactions_list)
+publisher_transactions_df.to_csv(get_out_filepath("publishers_transactions.csv"))
+#+END_SRC
+
+#+RESULTS:
+
+**** Group by transaction types
+
+#+BEGIN_SRC R :session rsession :results output replace
+p_transactions_csv <- here::here("iati-fts-datastore", "cache","publishers_transactions.csv")
+p_transactions_df <- read.csv(p_transactions_csv)
+p_transactions_df %>%
+  group_by(type) %>%
+  summarise(total = sum(value), count = n())
+#+END_SRC
+
+#+RESULTS:
+#+begin_example
+
+# A tibble: 5 x 3
+  type                      total count
+<int>
+1 Disbursement        79592134014 95136
+2 Expenditure         17913803669 54145
+3 Interest Payment        -681543    23
+4 Outgoing Commitment 58484408675 14084
+5 Purchase of Equity   3275344889   126
+#+end_example
+
+**** Check currency
+
+#+BEGIN_SRC R :session rsession :results output raw replace
+p_transactions_df %>%
+  group_by(currency) %>%
+  count()
+#+END_SRC
+
+#+RESULTS:
+
+# A tibble: 1 x 2
+# Groups:   currency [1]
+  currency      n
+1 GBP      163514
+
+*** Explore activities
+
+**** activity structure
+
+#+BEGIN_SRC python :session datastore :results output raw replace :wrap src json
+# print(json.dumps(out_json["response"]["docs"][0]["transaction"][0]))
+activity = out_json["response"]["docs"][0]
+activity['transaction'] = ""
+activity['budget'] = ""
+print(json.dumps(activity))
+#+END_SRC
+
+#+RESULTS:
+#+begin_src json
+{
+    "humanitarian": "0",
+    "activity_status_code": "4",
+    "title_narrative_text": [
+        "Providing quick impact support to the Libyan Government in delivering disarmament activity."
+    ],
+    "activity_date_end_planned": "2014-09-30",
+    "budget": "",
+    "activity_date_start_planned": "2013-10-15",
+    "recipient_country_code": [
+        "LY"
+    ],
+    "activity_date_end_actual": "2014-09-30",
+    "reporting_org_ref": "GB-GOV-1",
+    "iati_identifier": "GB-1-204310-101",
+    "activity_date_start_actual": "2013-10-15",
+    "transaction": "",
+    "description_narrative_text": [
+        "This activity (Providing quick impact support to the Libyan Government in delivering disarmament activity.) is a component of Providing support to the development of Libyan government counter-proliferation activity reported by DFID, with a funding type of 'Procurement of Services' and a budget of £1,832,812. This component benefits Libya, and works in the following sector(s): Civilian peace-building, conflict prevention and resolution. , with the following implementing partners: Foreign and Commonwealth Office. The start date is 15-10-2013 and the end date is 30-09-2014."
+    ]
+}
+#+end_src
+
+**** count by humanitarian
+***** Prepare activity by humanitarian 
+
+#+BEGIN_SRC python :session datastore :results output raw replace :wrap EXPORT output
+activity_df = pd.DataFrame(data = [{
+    'iati_identifier': act['iati_identifier'],
+    'humanitarian': act['humanitarian']
+} for act in out_json["response"]["docs"]])
+# activity_df.to_csv("cache/publisher_activity_row.csv")
+# print(activity_df.shape)
+print(activity_df.groupby('humanitarian').count())
+#+END_SRC
+
+#+RESULTS:
+#+begin_EXPORT output
+iati_identifier
+humanitarian                 
+0                       17335
+1                        1943
+#+end_EXPORT
+
+*** Explore by recipient countries
+
+#+BEGIN_SRC python :session datastore :results output raw replace :wrap EXPORT output
+from io import StringIO
+s = get_data("http://reference.iatistandard.org/203/codelists/downloads/clv1/codelist/Country.csv")
+cl_country = pd.read_csv(StringIO(s))
+cl_country = cl_country.drop(cl_country.columns[[2,3,4,5,6]], axis=1)
+print(cl_country.shape)
+print(cl_country.dtypes)
+#+END_SRC
+
+#+RESULTS:
+#+begin_EXPORT output
+True
+(251, 2)
+code    object
+name    object
+dtype: object
+#+end_EXPORT
+
+#+BEGIN_SRC python :session datastore :results output raw replace :wrap EXPORT output
+activity_country_df = pd.DataFrame(data = [{
+    'iati_identifier': act['iati_identifier'],
+    'recipient_country_code': act['recipient_country_code'] if "recipient_country_code" in act else ""
+} for act in out_json["response"]["docs"]])
+activity_country_df = activity_country_df.explode('recipient_country_code')
+# activity_df.to_csv("cache/publisher_activity_row.csv")
+# print(activity_country_df.shape)
+activity_country_frames = pd.merge(left = activity_country_df, right = cl_country, how = "left", left_on = "recipient_country_code", right_on = "code")
+
+pd.set_option('display.max_rows', None)
+print(activity_country_frames.fillna(' NA (missing country)').groupby('name').count()["iati_identifier"])
+
+# print(activity_country_df.groupby('recipient_country_code').count())
+pd.set_option('display.max_rows', 10)
+#+END_SRC
+
+#+RESULTS:
+#+begin_EXPORT output
+name
+ NA (missing country)                                         7512
+Afghanistan                                                    455
+Albania                                                         10
+American Samoa                                                   2
+Angola                                                          16
+Armenia                                                          8
+Bahamas (the)                                                    2
+Bahrain                                                          2
+Bangladesh                                                     470
+Benin                                                            2
+Bosnia and Herzegovina                                          53
+Brazil                                                          15
+Burkina Faso                                                     5
+Burundi                                                         81
+Cabo Verde                                                       2
+Cambodia                                                        64
+Cameroon                                                        27
+Central African Republic (the)                                  44
+Chad                                                            13
+Chile                                                            3
+China                                                           98
+Colombia                                                         1
+Congo (the Democratic Republic of the)                         323
+Congo (the)                                                      4
+Cuba                                                             2
+CÃ´te d'Ivoire                                                  10
+Dominica                                                         9
+Ecuador                                                          3
+Egypt                                                           17
+Eritrea                                                         14
+Ethiopia                                                       533
+Fiji                                                             2
+Gambia (the)                                                    20
+Georgia                                                          8
+Ghana                                                          350
+Greece                                                           7
+Guatemala                                                        5
+Guinea                                                           2
+Guyana                                                          24
+Haiti                                                           54
+Honduras                                                         2
+India                                                          442
+Indonesia                                                      157
+Iran (Islamic Republic of)                                       1
+Iraq                                                            79
+Jamaica                                                         41
+Japan                                                            4
+Jordan                                                         101
+Kenya                                                          530
+Kosovo                                                          65
+Kyrgyzstan                                                      56
+Lao People's Democratic Republic (the)                          11
+Lebanon                                                         94
+Lesotho                                                         26
+Liberia                                                         64
+Libya                                                           85
+Madagascar                                                       7
+Malawi                                                         434
+Maldives                                                         2
+Mali                                                            11
+Mauritania                                                       2
+Moldova (the Republic of)                                       48
+Mongolia                                                         2
+Montserrat                                                     198
+Mozambique                                                     316
+Myanmar                                                        300
+Nepal                                                          446
+Nicaragua                                                       11
+Niger (the)                                                     10
+Nigeria                                                        509
+Pakistan                                                       564
+Palestine, State of                                            191
+Papua New Guinea                                                 6
+Peru                                                             8
+Philippines (the)                                               17
+Pitcairn                                                        36
+Russian Federation (the)                                        12
+Rwanda                                                         298
+Saint Helena, Ascension and Tristan da Cunha                   177
+Saint Lucia                                                      2
+Samoa                                                            2
+Senegal                                                          6
+Serbia                                                          44
+Sierra Leone                                                   494
+Solomon Islands                                                  4
+Somalia                                                        398
+South Africa                                                    95
+South Sudan                                                    275
+Sri Lanka                                                       48
+Sudan (the)                                                    298
+Syrian Arab Republic                                           190
+Tajikistan                                                     119
+Tanzania, United Republic of                                   462
+Thailand                                                         2
+Timor-Leste                                                      2
+Togo                                                             2
+Tunisia                                                          5
+Turkey                                                          17
+Turks and Caicos Islands (the)                                  15
+Uganda                                                         389
+Ukraine                                                         64
+United Arab Emirates (the)                                       2
+United Kingdom of Great Britain and Northern Ireland (the)      16
+Uzbekistan                                                       2
+Vanuatu                                                          4
+Venezuela (Bolivarian Republic of)                               4
+Viet Nam                                                        98
+Virgin Islands (British)                                         2
+Yemen                                                          201
+Zambia                                                         300
+Zimbabwe                                                       239
+Name: iati_identifier, dtype: int64
+#+end_EXPORT
+
+** Explore Country
+*** Prepare query 
+- Preparing query to get all the activities data of the publisher
+
+#+BEGIN_SRC python :session datastore :results output
+iati_country = "NP"
+country_url = (f"https://iati.cloud/search/activity?q=" # return activitiy
+        f"recipient_country_code:{iati_country} " # that matches the given iati_country
+        f"&fl=iati_identifier,title_narrative_text,description_narrative_text,humanitarian,reporting_org_ref,reporting_org_narrative,"
+        f"activity_date_start_planned,activity_date_start_actual,activity_date_end_planned,activity_date_end_actual,activity_status_code,"
+        f"transaction,budget,recipient_country_code" # returning the following fields 
+        f"&wt=json" # in JSON format
+        f"&rows=5721") # and return a given number of rows
+print(f"{country_url.replace(' ', '%20')}")
+#+END_SRC
+
+#+RESULTS:
+: https://iati.cloud/search/activity?q=recipient_country_code:NP%20&fl=iati_identifier,title_narrative_text,description_narrative_text,humanitarian,reporting_org_ref,reporting_org_narrative,activity_date_start_planned,activity_date_start_actual,activity_date_end_planned,activity_date_end_actual,activity_status_code,transaction,budget,recipient_country_code&wt=json&rows=5721
+
+*** Make API Call
+#+BEGIN_SRC python :session datastore :results output :results:raw
+out_json = json.loads(get_data(country_url))
+print(out_json["response"]["numFound"])
+print(out_json["response"]["docs"][0]["title_narrative_text"][0])
+#+END_SRC
+
+#+RESULTS:
+: True
+: 5721
+: Support to International Crisis Group
+
+*** Activity Structure 
+#+BEGIN_SRC python :session datastore :results output raw :wrap SRC json
+print(json.dumps(out_json["response"]["docs"][0]))
+#+END_SRC
+
+#+RESULTS:
+#+begin_SRC json
+{
+    "humanitarian": "0",
+    "activity_status_code": "4",
+    "activity_date_start_planned": "2008-04-01",
+    "reporting_org_narrative": [
+        "UK - Department for International Development (DFID)"
+    ],
+    "activity_date_end_planned": "2012-03-31",
+    "title_narrative_text": [
+        "Support to International Crisis Group"
+    ],
+    "recipient_country_code": [
+        "NP"
+    ],
+    "reporting_org_ref": "GB-GOV-1",
+    "iati_identifier": "GB-1-114041",
+    "activity_date_start_actual": "2008-08-22",
+    "description_narrative_text": [
+        "To support and reinforce the efforts of National Governments, as well as the UN, European Union and other international and regional organisations to build lasting peace and prevent a renewed outbreak of conflict in Nepal."
+    ]
+}
+#+end_SRC
+
+
+*** Publishers
+
+#+BEGIN_SRC python :session datastore :results output raw replace :exports both :wrap SRC output
+countrywise_activities_df = pd.DataFrame([{
+    "iati_identifier": act["iati_identifier"],
+    "reporting_org": act["reporting_org_narrative"][0],
+    "humanitarian": act["humanitarian"]
+} for act in out_json["response"]["docs"]])
+print(countrywise_activities_df.shape)
+#+END_SRC
+
+#+RESULTS:
+#+begin_SRC output
+(5721, 3)
+#+end_SRC
+
+**** Reporting org
+
+#+BEGIN_SRC python :session datastore :results output raw replace :wrap SRC output
+pd.set_option('display.max_rows', None)
+print(countrywise_activities_df.groupby("reporting_org").count()["iati_identifier"])
+pd.set_option('display.max_rows', 10)
+#+END_SRC
+
+#+RESULTS:
+#+begin_SRC output
+reporting_org
+Aapasi Sahayog Kendra Syangja Nepal (ASK Nepal)                                                                  2
+Adam Smith International Limited                                                                                 1
+Age International UK (HelpAge International UK)                                                                  2
+Aidsfonds - Soa Aids Nederland                                                                                  11
+Anti-Slavery International                                                                                       1
+Asian Development Bank                                                                                          76
+Australia - Department of  Foreign Affairs and Trade                                                           178
+Avocats Sans Frontières                                                                                          2
+BBC Media Action                                                                                                 3
+BRITISH COUNCIL                                                                                                  2
+Backward Society Education (BASE)                                                                               14
+BasicNeeds                                                                                                       1
+British Red Cross                                                                                                5
+Burns Violence Survivors - Nepal                                                                                 1
+CARE International UK                                                                                            7
+CARE Nepal                                                                                                       3
+CATHOLIC RELIEF SERVICES                                                                                         2
+CDC Group plc                                                                                                    1
+Canada - International Development Research Centre/Centre de recherches pour le développement international     72
+Cardno Emerging Markets                                                                                          1
+Carers Worldwide                                                                                                 1
+Catholic Agency for Overseas Development                                                                         1
+Center for Research on Environment Health and Population Activities (CREHPA)                                     1
+ChildHopeUK                                                                                                      1
+Christian Aid                                                                                                   32
+Coffey International Development Limited, a Tetra Tech Company                                                   3
+Concern Worldwide                                                                                                1
+Concern Worldwide UK                                                                                             1
+Crown Agents Limited                                                                                             5
+DAI Europe                                                                                                       2
+DECP                                                                                                             1
+Daria Alexeeva                                                                                                   1
+Department for Environment, Food, and Rural Affairs                                                              1
+Development Initiatives Poverty Research Limited                                                                 3
+Disability and Development Partners                                                                              2
+Disasters Emergency Committee                                                                                    1
+EMMS International                                                                                               4
+Ecorys UK                                                                                                        1
+Energy Saving Trust                                                                                              1
+Enhanced Integrated Framework                                                                                    5
+European Commission - Directorate-General for International Cooperation and Development                        451
+European Commission - Humanitarian Aid & Civil Protection                                                       58
+European Commission - Service for Foreign Policy Instruments                                                    12
+FMO                                                                                                              1
+Federal Ministry for Economic Cooperation and Development                                                       90
+Find Your Feet                                                                                                   2
+Finland - Ministry for Foreign Affairs                                                                         679
+Food and Agriculture Organization (FAO)                                                                         30
+Free Press Unlimited                                                                                             1
+Gavi, the vaccine alliance                                                                                      16
+Germany - Federal Foreign Office                                                                                14
+Girls’ Education Challenge – Fund Manager PwC                                                                    2
+Global Affairs Canada                                                                                          101
+Global Green Growth Institute (GGGI)                                                                             1
+GlobalGiving.org                                                                                               488
+Handicap International                                                                                           3
+Handicap International Federation                                                                                1
+HelpAge International                                                                                           10
+ICCO Foundation                                                                                                  2
+ICF Consulting Services Limited                                                                                  2
+IDEO.org                                                                                                         1
+IMC WORLDWIDE                                                                                                   10
+INTOSAI Development Initiative                                                                                   3
+InterAction's NGO Aid Map                                                                                      165
+International Alert                                                                                             14
+International Child Development Initiatives                                                                      2
+International Federation of the Red Cross and Red Crescent (IFRC)                                                3
+International Finance Corporation                                                                               20
+International Fund for Agricultural Development (IFAD)                                                          18
+International Labour Organization (ILO)                                                                         64
+International Network of People who Use Drugs (INPUD)                                                            1
+International Organization for Migration (IOM)                                                                   9
+International Rescue Committee Inc.                                                                              1
+Ireland - Department of Foreign Affairs and Trade                                                               18
+Itad Limited                                                                                                     1
+KPMG Advisory Limited Tanzania                                                                                   1
+Landell Mills                                                                                                    1
+Learning for Life                                                                                                1
+Mainline M&E                                                                                                     1
+Malaria Consortium                                                                                               2
+MannionDaniels                                                                                                   2
+Marie Stopes International                                                                                       1
+Mercy Corps Europe                                                                                               5
+Millennium Challenge Corporation                                                                                63
+Ministry of Foreign Affairs of  Japan                                                                            4
+Ministry of Foreign Affairs, Denmark                                                                           227
+Ministry of interior of the Slovak Republic                                                                      1
+Mondiaal FNV                                                                                                     1
+Mott MacDonald Limited                                                                                           1
+NGO Federation of Nepal                                                                                          1
+Nepal Disabled Human Rights Center                                                                               1
+Nepal Netra Jyoti Sangh                                                                                          1
+Netherlands - Ministry of Foreign Affairs                                                                        8
+Netherlands Enterprise Agency                                                                                   23
+Netherlands Red Cross                                                                                            8
+New Zealand - Ministry of Foreign Affairs and Trade - New Zealand Aid Programme                                 18
+Norad - Norwegian Agency for Development Cooperation                                                           102
+Options Consultancy Services                                                                                     2
+Orbis Charitable Trust                                                                                           1
+Orbis International                                                                                              1
+Other ministries                                                                                                 1
+Overseas Development Institute                                                                                   2
+Oxfam GB                                                                                                        83
+Oxfam Novib                                                                                                     19
+Oxford Policy Management                                                                                         5
+PHASE Worldwide                                                                                                  4
+PRACTICA Foundation                                                                                              2
+PUM Netherlands                                                                                                  1
+Palladium International Ltd (UK)                                                                                 2
+People in Need                                                                                                   7
+Plan International Netherlands                                                                                   5
+Plan International UK                                                                                            8
+PricewaterhouseCoopers Private Limited India                                                                     2
+PwC                                                                                                              2
+RAIN foundation                                                                                                  4
+RUAF Foundation                                                                                                  1
+Raleigh International                                                                                            1
+Republic of Korea                                                                                              101
+Restless Development                                                                                             1
+Rutgers                                                                                                          1
+SECOURS CATHOLIQUE - CARITAS FRANCE                                                                              3
+Saferworld                                                                                                       3
+Save the Children International                                                                                 16
+Save the Children UK                                                                                            16
+Sightsavers                                                                                                      1
+Simavi                                                                                                           5
+Slovak Aid                                                                                                       1
+Social Development Direct Limited                                                                                1
+South Asian Women Development Forum                                                                              2
+Stichting fondsbeheer DGGF lokaal MKB                                                                            1
+Street Child                                                                                                     1
+Sweden, through Swedish International Development Cooperation Agency (Sida)                                    418
+Switzerland - Swiss Agency for Development and Cooperation (SDC)                                               203
+Terre des Hommes Netherlands                                                                                     8
+The Global Fund to Fight AIDS, Tuberculosis and Malaria                                                         19
+The Global Network of People Living with HIV (GNP+)                                                              1
+The Joint United Nations Programme on HIV and AIDS (UNAIDS) Secretariat                                         20
+The Leprosy Mission England and Wales                                                                            1
+The Louis Berger Group, Inc.                                                                                     1
+The OPEC Fund for International Development (OFID)                                                              22
+The World Bank                                                                                                  42
+Trianglen                                                                                                       44
+UK - Department for Business, Energy and Industrial Strategy (BEIS)                                              1
+UK - Department for International Development (DFID)                                                           446
+UK - Department of Health (DH)                                                                                   1
+UK - Foreign & Commonwealth Office                                                                              20
+UN Pooled Funds                                                                                                 56
+UN Women                                                                                                         9
+United Mission to Nepal                                                                                          1
+United Nations Capital Development Fund                                                                         37
+United Nations Central Emergency Response Fund (CERF)                                                           67
+United Nations Development Programme (UNDP)                                                                     91
+United Nations Educational, Scientific and Cultural Organization (UNESCO)                                       36
+United Nations Environment Programme (UNEP)                                                                      2
+United Nations High Commissioner for Refugees (UNHCR)                                                            6
+United Nations Industrial Development Organization (UNIDO)                                                      10
+United Nations Office for Project Services (UNOPS)                                                               9
+United Nations Office for the Coordination of Humanitarian Affairs (OCHA)                                        1
+United Nations Population Fund                                                                                  17
+United Nations World Food Programme (WFP)                                                                       26
+United States                                                                                                  436
+University of Amsterdam                                                                                          2
+Voluntary Service Overseas                                                                                       5
+WASH Alliance International                                                                                      2
+WASTE advisers on urban environment and development                                                              1
+WSM-World Solidarity                                                                                             1
+WWF-UK                                                                                                           2
+WYG International                                                                                                1
+Water Integrity Network Association                                                                              1
+WaterAid                                                                                                         1
+Women Engage for a Common Future                                                                                 1
+Women's Refugee Commission                                                                                       1
+World Health Organization                                                                                      112
+World Vision International                                                                                       1
+World Vision UK                                                                                                  1
+YoungInnovations                                                                                                 2
+Zoological Society of London                                                                                     3
+iDE                                                                                                              3
+interburns                                                                                                       2
+kidasha                                                                                                          1
+market and employment for peace and stability                                                                    1
+Name: iati_identifier, dtype: int64
+#+end_SRC
+
+**** Activities count by humanitarian
+
+#+BEGIN_SRC python :session datastore :results output raw replace :wrap SRC output
+pd.set_option('display.max_rows', None)
+print(countrywise_activities_df.groupby("humanitarian").count()["iati_identifier"])
+pd.set_option('display.max_rows', 10)
+#+END_SRC
+
+#+RESULTS:
+#+begin_SRC output
+humanitarian
+0    5189
+1     532
+Name: iati_identifier, dtype: int64
+#+end_SRC
+
+**** Transactions by type
+
+***** Prepare transaction
+
+#+BEGIN_SRC python :session datastore :results output raw replace
+country_transactions_list = []
+for x in out_json["response"]["docs"]:
+    if 'transaction' in x:
+        country_transactions_list.append(process_transactions(x['transaction']))
+#publisher_transactions_list = [process_transactions(x['transaction']) if 'transacion' in x else "" for x in out_json['response']['docs']]
+country_transactions_df = pd.concat(country_transactions_list)
+#publisher_transactions_df.to_csv(get_out_filepath("publishers_transactions.csv"))
+#+END_SRC
+
+#+RESULTS:
+
+#+BEGIN_SRC python :session datastore
+def arr_to_org(arr):
+    line = "|".join(str(item) for item in arr)
+    return "|{}|".format(line)
+
+def df_to_org(df):
+    return "\n".join([arr_to_org(df.columns)]
+        + [arr_to_org(row) for row in df.values])
+
+
+#+END_SRC
+
+#+RESULTS:
+
+
+#+BEGIN_SRC python :session datastore :results output raw :wrap SRC output 
+pd.options.display.float_format = '{:,.2f}'.format
+country_transactions_df["value"] = pd.to_numeric(country_transactions_df["value"], errors = "ignore")
+print(country_transactions_df.groupby("type").agg({'iati_identifier': 'count', 'value': 'sum'}))
+
+#+END_SRC
+
+#+RESULTS:
+#+begin_SRC output
+iati_identifier              value
+type                                                   
+Disbursement                   22145  35,835,720,236.69
+Expenditure                     6844   6,458,383,441.47
+Incoming Commitment              633     886,760,704.35
+Incoming Funds                  3863 164,381,488,476.33
+Interest Payment                1862      -9,994,265.39
+Loan Repayment                   347     661,946,609.95
+Outgoing Commitment             6570  50,350,784,206.72
+Reimbursement                     52      -3,281,328.66
+#+end_SRC
+
+
+
+
+
+
