@@ -1,7 +1,6 @@
 #+title: IATI Datastore challenge for FTS
 #+PROPERTY: header-args :eval never-export :exports both
 #+EXCLUDE_TAGS: noexport
-#+HTML_HEAD: <link rel="stylesheet" type="text/css" href="http://thomasf.github.io/solarized-css/solarized-light.min.css" />
 #+HTML_HEAD: <link rel="stylesheet" href="http://dakrone.github.io/org.css" type="text/css" />
 
 * few examples of export style                                     :noexport:
